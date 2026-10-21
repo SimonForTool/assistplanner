@@ -1,0 +1,21 @@
+{# Jednoduché obrysové ikony (24×24, currentColor) #}
+{% macro icon(name) -%}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if name == 'home' -%}<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-6h5v6"/>
+{%- elif name == 'promise' -%}<path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M14 21H5a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h5"/><circle cx="9" cy="14.5" r="2.5"/>
+{%- elif name == 'plus' -%}<path d="M12 5v14"/><path d="M5 12h14"/>
+{%- elif name == 'history' -%}<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>
+{%- elif name == 'user' -%}<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+{%- elif name == 'mic' -%}<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/>
+{%- elif name == 'stop' -%}<rect x="6" y="6" width="12" height="12" rx="2"/>
+{%- elif name == 'search' -%}<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+{%- elif name == 'check' -%}<path d="M5 12.5 10 17 19 7"/>
+{%- elif name == 'filter' -%}<path d="M3 5h18"/><path d="M6 12h12"/><path d="M10 19h4"/>
+{%- elif name == 'download' -%}<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>
+{%- elif name == 'back' -%}<path d="M15 18 9 12l6-6"/>
+{%- elif name == 'refresh' -%}<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>
+{%- elif name == 'upload' -%}<path d="M12 20V9"/><path d="m7 14 5-5 5 5"/><path d="M5 4h14"/>
+{%- elif name == 'logout' -%}<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

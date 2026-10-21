@@ -1,9 +1,10 @@
-"""Flask application factory pro AssistPlanner.
+"""Flask application factory pro Syncho – Assistant Planner.
 
 Lokální spuštění:   python app.py          (http://localhost:5000)
 PythonAnywhere:     viz wsgi.py a README.md
 """
 import logging
+import mimetypes
 import secrets
 import time
 
@@ -18,6 +19,7 @@ from utils import helpers
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 DEADLINE_CHECK_INTERVAL = 600  # s
 _last_deadline_check = 0.0

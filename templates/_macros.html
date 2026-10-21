@@ -1,9 +1,40 @@
+{% from "_icons.html" import icon %}
+
 {% macro priority_badge(p) -%}
-  <span class="badge text-bg-{{ PRIORITY_BADGES[p] }}">{{ p.value }}</span>
+  <span class="tag tone-{{ PRIORITY_BADGES[p] }}">{{ p.value }}</span>
 {%- endmacro %}
 
 {% macro status_badge(s) -%}
-  <span class="badge text-bg-{{ STATUS_BADGES[s] }}">{{ s.value }}</span>
+  <span class="tag tone-{{ STATUS_BADGES[s] }}">{{ s.value }}</span>
+{%- endmacro %}
+
+{# Karta úkolu pro seznamy (celá karta vede na detail, ✓ úkol rychle uzavře) #}
+{% macro task_card(t) -%}
+  {% set done = t.status in [TaskStatus.CLOSED, TaskStatus.CANCELLED] %}
+  <article class="task-card prio-{{ PRIORITY_BADGES[t.priority] }} {{ 'is-done' if done }}">
+    <div class="body">
+      <div class="code">{{ t.code }}{% if t.is_commitment %} · 🤝 ZÁVAZEK{% endif %}</div>
+      <a class="title" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a>
+      <div class="meta">
+        <span class="{{ 'overdue' if is_overdue(t) }}">🗓️ {{ t.due_date|dt }}{{ ' · po termínu' if is_overdue(t) }}</span>
+        {% if t.assignee_target %}<span>👤 {{ t.assignee_target }}</span>{% endif %}
+        {% if t.location %}<span>📍 {{ t.location }}</span>{% endif %}
+      </div>
+      <div class="tags">
+        {{ priority_badge(t.priority) }} {{ status_badge(t.status) }}
+        <span class="tag tone-muted">✍️ {{ t.creator.value }}</span>
+      </div>
+    </div>
+    {% if not done %}
+    <form method="post" action="{{ url_for('tasks.set_status', task_id=t.id) }}" class="done-form">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="CLOSED">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button class="btn btn-soft-success btn-icon" title="Uzavřít" aria-label="Uzavřít {{ t.code }}">
+        <span style="width:22px;height:22px;display:inline-flex">{{ icon('check') }}</span></button>
+    </form>
+    {% endif %}
+  </article>
 {%- endmacro %}
 
 {% macro csrf() -%}
@@ -19,7 +50,7 @@
   <div class="row g-3">
     <div class="col-12">
       <label class="form-label" for="title">Název *</label>
-      <input class="form-control form-control-lg" id="title" name="title" required maxlength="255"
+      <input class="form-control" id="title" name="title" required maxlength="255"
              value="{{ v.get('title') or '' }}">
     </div>
     <div class="col-sm-6">
@@ -61,16 +92,17 @@
       <label class="form-label" for="description">Popis / poznámka</label>
       <textarea class="form-control" id="description" name="description" rows="3">{{ v.get('description') or '' }}</textarea>
     </div>
+    <div class="col-12"><div class="form-label mb-0">📆 Outlook kalendář</div></div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_deputy_cal" name="sync_deputy_cal" {{ 'checked' if v.get('sync_deputy_cal') }}>
-        <label class="form-check-label" for="sync_deputy_cal">📆 Přidat do kalendáře náměstka</label>
+        <label class="form-check-label" for="sync_deputy_cal">Do kalendáře náměstka</label>
       </div>
     </div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_assistant_cal" name="sync_assistant_cal" {{ 'checked' if v.get('sync_assistant_cal') }}>
-        <label class="form-check-label" for="sync_assistant_cal">📆 Přidat do kalendáře asistentky</label>
+        <label class="form-check-label" for="sync_assistant_cal">Do kalendáře asistentky</label>
       </div>
     </div>
   </div>
@@ -79,8 +111,8 @@
 {% macro export_links(scope=none) -%}
   {% set args = request.args.to_dict(flat=false) %}
   {% if scope %}{% set _ = args.update({'scope': [scope]}) %}{% endif %}
-  <div class="btn-group btn-group-sm">
-    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.export_csv', **args) }}">⬇️ CSV</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.export_xlsx', **args) }}">⬇️ Excel</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-soft btn-sm" href="{{ url_for('dashboard.export_csv', **args) }}">⬇️ CSV</a>
+    <a class="btn btn-soft btn-sm" href="{{ url_for('dashboard.export_xlsx', **args) }}">⬇️ Excel</a>
   </div>
 {%- endmacro %}

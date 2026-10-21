@@ -83,6 +83,13 @@
     return;
   }
 
+  function setRecording(on) {
+    recBtn.classList.toggle('recording', on);
+    recBtn.querySelector('.ico-mic').style.display = on ? 'none' : 'inline-flex';
+    recBtn.querySelector('.ico-stop').style.display = on ? 'inline-flex' : 'none';
+    recBtn.setAttribute('aria-label', on ? 'Zastavit a zpracovat' : 'Nahrávat');
+  }
+
   function pickMime() {
     const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
     return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
@@ -98,16 +105,14 @@
       recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
       recorder.onstop = () => {
         stream.getTracks().forEach(t => t.stop());
-        recBtn.classList.remove('recording');
-        recBtn.textContent = '⏺️ Nahrávat';
+        setRecording(false);
         const type = recorder.mimeType || 'audio/webm';
         const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
         sendAudio(new Blob(chunks, { type }), 'nahravka.' + ext);
       };
       recorder.start();
-      recBtn.classList.add('recording');
-      recBtn.textContent = '⏹️ Zastavit a zpracovat';
-      setStatus('🔴 Nahrávám… mluvte.');
+      setRecording(true);
+      setStatus('🔴 Nahrávám… klepnutím ukončíte.');
     } catch (e) {
       setStatus('Mikrofon není dostupný: ' + e.message);
     }

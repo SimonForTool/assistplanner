@@ -4,18 +4,18 @@ from datetime import date, datetime, time, timedelta, timezone
 import config
 from models import Priority, TaskStatus
 
-# Bootstrap 5 barvy odznaků
+# CSS třídy odznaků (static/css/app.css: .tone-*)
 PRIORITY_BADGES = {
-    Priority.LOW: "secondary",
-    Priority.MEDIUM: "primary",
-    Priority.HIGH: "warning",
-    Priority.URGENT: "danger",
+    Priority.LOW: "muted",
+    Priority.MEDIUM: "sky",
+    Priority.HIGH: "amber",
+    Priority.URGENT: "red",
 }
 STATUS_BADGES = {
-    TaskStatus.OPEN: "primary",
-    TaskStatus.IN_PROGRESS: "warning",
-    TaskStatus.CLOSED: "success",
-    TaskStatus.CANCELLED: "secondary",
+    TaskStatus.OPEN: "navy",
+    TaskStatus.IN_PROGRESS: "amber",
+    TaskStatus.CLOSED: "green",
+    TaskStatus.CANCELLED: "muted",
 }
 ACTIVE_STATUSES = (TaskStatus.OPEN, TaskStatus.IN_PROGRESS)
 

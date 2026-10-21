@@ -1,25 +1,23 @@
 {% if history %}
-<div class="table-responsive">
-  <table class="table table-sm align-middle mb-0">
-    <thead class="table-light"><tr><th>Čas</th>{% if show_task %}<th>Úkol</th>{% endif %}<th>Uživatel</th><th>Akce</th><th>Změny</th></tr></thead>
-    <tbody>
-    {% for h in history %}
-      <tr>
-        <td class="text-nowrap">{{ h.timestamp|local|dt }}</td>
+<ul class="timeline">
+  {% for h in history %}
+  {% set tone = 'red' if h.action == 'Smazáno' else 'green' if h.action == 'Vytvořeno' else 'amber' if 'stav' in h.action else 'sky' %}
+  <li>
+    <span class="dot tone-{{ tone }}">{{ '🗑️' if tone == 'red' else '✨' if tone == 'green' else '🔁' if tone == 'amber' else '✏️' }}</span>
+    <div class="flex-grow-1 min-w-0">
+      <div class="d-flex flex-wrap gap-2 align-items-baseline">
+        <strong>{{ h.action }}</strong>
         {% if show_task %}
-        <td class="text-nowrap">
-          {% if h.task_id %}<a href="{{ url_for('tasks.detail', task_id=h.task_id) }}">{{ h.task_code }}</a>{% else %}<span class="text-body-secondary">{{ h.task_code }}</span>{% endif %}
-          <div class="small text-body-secondary">{{ h.task_title or '' }}</div>
-        </td>
+          {% if h.task_id %}<a class="small fw-semibold" href="{{ url_for('tasks.detail', task_id=h.task_id) }}">{{ h.task_code }}</a>{% else %}<span class="small text-body-secondary">{{ h.task_code }}</span>{% endif %}
         {% endif %}
-        <td>{{ h.user.value }}</td>
-        <td><span class="badge text-bg-{{ 'danger' if h.action == 'Smazáno' else 'success' if h.action == 'Vytvořeno' else 'light border' }}">{{ h.action }}</span></td>
-        <td class="small">{{ h.changes_summary or '' }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
+        <span class="when ms-auto">{{ h.timestamp|local|dt }} · {{ h.user.value }}</span>
+      </div>
+      {% if show_task and h.task_title %}<div class="small fw-semibold">{{ h.task_title }}</div>{% endif %}
+      {% if h.changes_summary %}<div class="what text-body-secondary">{{ h.changes_summary }}</div>{% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ul>
 {% else %}
 <p class="text-body-secondary mb-0">Žádné záznamy.</p>
 {% endif %}

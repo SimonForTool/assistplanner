@@ -1,54 +1,65 @@
 {% extends "base.html" %}
 {% from "_macros.html" import task_fields, csrf, priority_badge, status_badge with context %}
-{% block title %}{{ task.code }} · AssistPlanner{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ task.code }} · {{ settings.APP_NAME }}{% endblock %}
 {% block content %}
-<a class="small" href="{{ url_for('dashboard.index') }}">← Přehled</a>
-<div class="card shadow-sm my-2">
-  <div class="card-body">
-    <h1 class="h4">{{ task.code }} · {{ task.title }}</h1>
-    <div class="d-flex flex-wrap gap-3 align-items-center small">
-      {{ priority_badge(task.priority) }} {{ status_badge(task.status) }}
-      {% if task.is_commitment %}<span class="badge text-bg-info">🤝 Závazek</span>{% endif %}
-      <span class="{{ 'text-danger fw-semibold' if is_overdue(task) }}">🗓️ {{ task.due_date|dt }}</span>
-      {% if task.location %}<span>📍 {{ task.location }}</span>{% endif %}
-      {% if task.assignee_target %}<span>👤 {{ task.assignee_target }}</span>{% endif %}
-      <span>✍️ zadal(a): {{ task.creator.value }}</span>
-      {% if task.outlook_event_id_deputy or task.outlook_event_id_assistant %}
-        <span>📆 V kalendáři:
-          {{ [task.outlook_event_id_deputy and 'Náměstek', task.outlook_event_id_assistant and 'Asistentka']|select|join(', ') }}</span>
-      {% endif %}
-    </div>
-    {% if task.description %}<p class="mt-3 mb-0 text-pre">{{ task.description }}</p>{% endif %}
+<a class="d-inline-flex align-items-center gap-1 small fw-semibold mb-2 text-decoration-none" href="{{ url_for('dashboard.index') }}">
+  <span style="width:18px;height:18px;display:inline-flex">{{ icon('back') }}</span> Přehled</a>
+
+<section class="detail-hero">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <span class="code small fw-bold text-body-secondary">{{ task.code }}</span>
+    {{ priority_badge(task.priority) }} {{ status_badge(task.status) }}
+    {% if task.is_commitment %}<span class="tag tone-sky">🤝 Závazek</span>{% endif %}
   </div>
-  <div class="card-footer d-flex flex-wrap gap-2">
-    {% for label, status, style in [('⏳ Probíhá', TaskStatus.IN_PROGRESS, 'warning'), ('✅ Uzavřít', TaskStatus.CLOSED, 'success'),
-                                     ('🚫 Zrušit', TaskStatus.CANCELLED, 'secondary'), ('🔄 Znovu otevřít', TaskStatus.OPEN, 'primary')] %}
+  <h1>{{ task.title }}</h1>
+  {% if task.description %}<p class="mb-0 text-pre text-body-secondary">{{ task.description }}</p>{% endif %}
+
+  <div class="info-list">
+    <div class="info-item"><span>🗓️</span><span><span class="lbl">Termín</span>
+      <span class="{{ 'text-danger fw-bold' if is_overdue(task) }}">{{ task.due_date|dt }}{{ ' · po termínu' if is_overdue(task) }}</span></span></div>
+    {% if task.assignee_target %}<div class="info-item"><span>👤</span><span><span class="lbl">{{ 'Komu slíbeno' if task.is_commitment else 'Pro koho' }}</span>{{ task.assignee_target }}</span></div>{% endif %}
+    {% if task.location %}<div class="info-item"><span>📍</span><span><span class="lbl">Místo</span>{{ task.location }}</span></div>{% endif %}
+    <div class="info-item"><span>✍️</span><span><span class="lbl">Zadal(a)</span>{{ task.creator.value }}</span></div>
+    {% if task.outlook_event_id_deputy or task.outlook_event_id_assistant %}
+    <div class="info-item"><span>📆</span><span><span class="lbl">V kalendáři</span>
+      {{ [task.outlook_event_id_deputy and 'Náměstek', task.outlook_event_id_assistant and 'Asistentka']|select|join(', ') }}</span></div>
+    {% endif %}
+  </div>
+
+  <div class="status-actions">
+    {% for label, status, style in [('✅ Uzavřít', TaskStatus.CLOSED, 'btn-soft-success'), ('⏳ Probíhá', TaskStatus.IN_PROGRESS, 'btn-soft'),
+                                     ('🔄 Otevřít', TaskStatus.OPEN, 'btn-soft'), ('🚫 Zrušit', TaskStatus.CANCELLED, 'btn-soft')] %}
       <form method="post" action="{{ url_for('tasks.set_status', task_id=task.id) }}">
         {{ csrf() }}<input type="hidden" name="status" value="{{ status.name }}">
-        <button class="btn btn-outline-{{ style }}" {{ 'disabled' if task.status == status }}>{{ label }}</button>
+        <button class="btn {{ style }}" {{ 'disabled' if task.status == status }}>{{ label }}</button>
       </form>
     {% endfor %}
-    <form method="post" action="{{ url_for('tasks.delete', task_id=task.id) }}" class="ms-auto"
-          onsubmit="return confirm('Opravdu smazat {{ task.code }}? Smažou se i události v Outlooku.');">
-      {{ csrf() }}<button class="btn btn-outline-danger">🗑️ Smazat</button>
-    </form>
   </div>
-</div>
+</section>
 
-<ul class="nav nav-tabs mt-3" role="tablist">
-  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-edit" type="button">✏️ Upravit</button></li>
-  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-history" type="button">🕓 Historie ({{ history|length }})</button></li>
-</ul>
-<div class="tab-content card card-body border-top-0 rounded-top-0 shadow-sm">
+<div class="d-flex justify-content-center my-3">
+  <ul class="nav nav-pills-sy" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-edit" type="button">Upravit</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-history" type="button">Historie ({{ history|length }})</button></li>
+  </ul>
+</div>
+<div class="tab-content">
   <div class="tab-pane fade show active" id="tab-edit">
     <form method="post">
-      {{ csrf() }}
-      {{ task_fields(values, show_status=true) }}
-      <button class="btn btn-primary mt-3">💾 Uložit změny</button>
+      <div class="card"><div class="card-body">
+        {{ csrf() }}
+        {{ task_fields(values, show_status=true) }}
+      </div></div>
+      <div class="sticky-actions"><button class="btn btn-primary btn-lg w-100">Uložit změny</button></div>
+    </form>
+    <form method="post" action="{{ url_for('tasks.delete', task_id=task.id) }}" class="text-center mt-3"
+          onsubmit="return confirm('Opravdu smazat {{ task.code }}? Smažou se i události v Outlooku.');">
+      {{ csrf() }}<button class="btn btn-soft-danger">🗑️ Smazat úkol</button>
     </form>
   </div>
   <div class="tab-pane fade" id="tab-history">
-    {% include "_history_table.html" %}
+    <div class="card"><div class="card-body">{% include "_history_table.html" %}</div></div>
   </div>
 </div>
 {% endblock %}

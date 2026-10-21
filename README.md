@@ -1,8 +1,10 @@
-# AssistPlanner
+# Syncho – Assistant Planner
 
 Webová aplikace (Flask + Bootstrap 5) pro náměstka a jeho asistentku: ranní briefing, úkoly
 a závazky („Co komu slíbil“), hlasové zadávání s AI, synchronizace s Outlook kalendářem,
-notifikace a auditní stopa všech změn. Připravená pro **PythonAnywhere**.
+notifikace a auditní stopa všech změn. Navržená primárně pro **telefon a tablet**
+(spodní navigace, karty, velké dotykové prvky; lze přidat na plochu jako aplikace).
+Připravená pro **PythonAnywhere**.
 
 ## Lokální spuštění
 
@@ -74,7 +76,8 @@ services/task_service.py     CRUD s auditem, sync kalendáře, notifikace (routy
 services/ai_service.py       Whisper, strukturované zadání (JSON schema), ranní briefing
 services/outlook_service.py  MS Graph – vytvoření / úprava / smazání událostí
 services/notify_service.py   Telegram, webhook, e-mail
-templates/                   Jinja2 + Bootstrap 5
+templates/                   Jinja2 + Bootstrap 5 (vlastní styl v static/css/app.css)
+static/img/                  logo a ikony aplikace, static/manifest.webmanifest pro „Přidat na plochu“
 static/js/recorder.js        nahrávání hlasu (MediaRecorder) a předvyplnění formuláře
 ```
 

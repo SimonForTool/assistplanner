@@ -1,65 +1,62 @@
 {% extends "base.html" %}
 {% from "_macros.html" import status_badge, priority_badge, csrf, export_links with context %}
-{% block title %}Co komu slíbil · AssistPlanner{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}Co komu slíbil · {{ settings.APP_NAME }}{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <h1 class="h3 mb-0">🤝 Co komu slíbil</h1>
-  <a class="btn btn-primary" href="{{ url_for('tasks.new', type='commitment') }}">➕ Nový závazek</a>
+<div class="page-head">
+  <div><div class="sub">Závazky</div><h1>Co komu slíbil</h1></div>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('tasks.new', type='commitment') }}">+ Závazek</a>
 </div>
-<div class="row g-3 mb-3">
-  <div class="col-6 col-md-3"><div class="card kpi" style="border-left: 4px solid var(--bs-primary)"><div class="card-body py-2">
-    <div class="small text-body-secondary">Nesplněné závazky</div><div class="fs-2 fw-semibold">{{ open_count }}</div></div></div></div>
-  <div class="col-6 col-md-3"><div class="card kpi" style="border-left: 4px solid var(--bs-danger)"><div class="card-body py-2">
-    <div class="small text-body-secondary">Po termínu</div><div class="fs-2 fw-semibold">{{ overdue|length }}</div></div></div></div>
+
+<div class="kpi-grid mb-3" style="grid-template-columns: repeat(2, 1fr)">
+  <div class="kpi" style="--kpi-color: var(--sy-sky)"><span class="kpi-icon">🤝</span>
+    <div class="kpi-value">{{ open_count }}</div><div class="kpi-label">Nesplněné</div></div>
+  <div class="kpi {{ 'is-hot' if overdue }}" style="--kpi-color: var(--sy-red)"><span class="kpi-icon">⚠️</span>
+    <div class="kpi-value">{{ overdue|length }}</div><div class="kpi-label">Po termínu</div></div>
 </div>
-{% if overdue %}
-<div class="alert alert-danger">
-  <strong>Po termínu:</strong>
-  {% for t in overdue %}<a class="alert-link" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.assignee_target or '?' }} – {{ t.title }}</a>{{ '; ' if not loop.last }}{% endfor %}
-</div>
-{% endif %}
-<form class="d-flex flex-wrap gap-2 mb-3" method="get">
-  <input class="form-control" style="max-width:24rem" name="q" value="{{ search }}" placeholder="🔎 Hledat osobu nebo závazek">
-  <div class="form-check form-switch align-self-center ms-2">
-    <input class="form-check-input" type="checkbox" role="switch" id="all" name="all" value="1" {{ 'checked' if not only_active }} onchange="this.form.submit()">
-    <label class="form-check-label" for="all">Zobrazit i splněné</label>
+
+<form method="get" class="mb-3">
+  <div class="search-wrap mb-2">
+    <span class="icon" style="width:20px;height:20px;display:inline-flex">{{ icon('search') }}</span>
+    <input class="form-control" type="search" name="q" value="{{ search }}" placeholder="Hledat osobu nebo závazek…">
   </div>
-  <button class="btn btn-outline-primary">Hledat</button>
-  <div class="ms-auto">{{ export_links('commitments') }}</div>
+  <div class="d-flex justify-content-between align-items-center gap-2">
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="all" name="all" value="1" {{ 'checked' if not only_active }} onchange="this.form.submit()">
+      <label class="form-check-label small fw-semibold" for="all">Včetně splněných</label>
+    </div>
+    {{ export_links('commitments') }}
+  </div>
 </form>
 
 {% if rows %}
-<div class="row g-3">
+<div class="task-list">
   {% for t in rows %}
-  <div class="col-md-6 col-xl-4">
-    <div class="card h-100 shadow-sm commitment {{ 'border-danger' if is_overdue(t) }}">
-      <div class="card-body">
-        <div class="small text-body-secondary">Komu slíbeno</div>
-        <div class="fs-5 fw-semibold mb-2">👤 {{ t.assignee_target or '—' }}</div>
-        <div class="small text-body-secondary">Co</div>
-        <div class="mb-2"><a class="text-reset fw-medium" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a></div>
-        <div class="d-flex flex-wrap gap-3 small">
-          <span class="{{ 'text-danger fw-semibold' if is_overdue(t) }}">🗓️ {{ '⚠️ ' if is_overdue(t) }}{{ t.due_date|dt }}</span>
-          {% if t.location %}<span>📍 {{ t.location }}</span>{% endif %}
-          <span>✍️ {{ t.creator.value }}</span>
-        </div>
+  {% set late = is_overdue(t) %}
+  <article class="task-card {{ 'prio-red' if late else 'prio-sky' }} {{ 'is-done' if t.status in [TaskStatus.CLOSED, TaskStatus.CANCELLED] }}">
+    <div class="body">
+      <div class="code">KOMU</div>
+      <div class="fw-bold fs-5 lh-sm" style="color: var(--sy-navy-900)">{{ t.assignee_target or '—' }}</div>
+      <a class="title fw-semibold mt-1" style="font-weight:600" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a>
+      <div class="meta">
+        <span class="{{ 'overdue' if late }}">🗓️ {{ t.due_date|dt }}{{ ' · po termínu' if late }}</span>
+        {% if t.location %}<span>📍 {{ t.location }}</span>{% endif %}
+        <span>✍️ {{ t.creator.value }}</span>
       </div>
-      <div class="card-footer d-flex align-items-center gap-2 bg-transparent">
-        {{ status_badge(t.status) }} {{ priority_badge(t.priority) }}
-        <span class="small text-body-secondary">{{ t.code }}</span>
-        {% if t.status not in [TaskStatus.CLOSED, TaskStatus.CANCELLED] %}
-        <form method="post" action="{{ url_for('tasks.set_status', task_id=t.id) }}" class="ms-auto">
-          {{ csrf() }}<input type="hidden" name="status" value="CLOSED">
-          <input type="hidden" name="next" value="{{ request.full_path }}">
-          <button class="btn btn-sm btn-success">✅ Splněno</button>
-        </form>
-        {% endif %}
-      </div>
+      <div class="tags">{{ status_badge(t.status) }} {{ priority_badge(t.priority) }} <span class="tag tone-muted">{{ t.code }}</span></div>
     </div>
-  </div>
+    {% if t.status not in [TaskStatus.CLOSED, TaskStatus.CANCELLED] %}
+    <form method="post" action="{{ url_for('tasks.set_status', task_id=t.id) }}" class="done-form">
+      {{ csrf() }}<input type="hidden" name="status" value="CLOSED">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button class="btn btn-soft-success btn-icon" title="Splněno" aria-label="Splněno {{ t.code }}">
+        <span style="width:22px;height:22px;display:inline-flex">{{ icon('check') }}</span></button>
+    </form>
+    {% endif %}
+  </article>
   {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-info">Žádné závazky.</div>
+<div class="empty card"><span class="emoji">🤝</span>Žádné závazky.</div>
 {% endif %}
 {% endblock %}

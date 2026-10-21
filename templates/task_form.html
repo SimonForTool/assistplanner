@@ -1,50 +1,55 @@
 {% extends "base.html" %}
 {% from "_macros.html" import task_fields, csrf with context %}
-{% block title %}Nový úkol · AssistPlanner{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}Nový úkol · {{ settings.APP_NAME }}{% endblock %}
 {% block content %}
-<h1 class="h3 mb-3">➕ Nový úkol</h1>
+<div class="page-head">
+  <h1>Nový úkol</h1>
+  <a class="btn btn-soft btn-sm" href="{{ url_for('tasks.new') }}">Vyčistit</a>
+</div>
 
-<div class="row g-2 mb-3">
-  {% for key, (icon, label, _) in templates.items() %}
-  <div class="col-6 col-md-3">
-    <a class="btn btn-outline-primary btn-lg w-100 template-btn" href="{{ url_for('tasks.new', template=key) }}">
-      <span class="fs-3 d-block">{{ icon }}</span>{{ label }}
-    </a>
-  </div>
+<div class="tpl-grid mb-3">
+  {% for key, (emoji, label, _) in templates.items() %}
+  <a class="tpl" href="{{ url_for('tasks.new', template=key) }}"><span class="ico">{{ emoji }}</span>{{ label }}</a>
   {% endfor %}
 </div>
 
 <div class="row g-3">
   <div class="col-lg-5">
-    <div class="card shadow-sm h-100">
+    <div class="card voice-card {{ 'border border-2 border-info' if request.args.get('voice') }}" id="voice">
       <div class="card-body">
-        <h2 class="h5">🎙️ Nadiktovat úkol</h2>
-        {% if not settings.openai_enabled() %}
-          <p class="small text-warning-emphasis">Hlas vyžaduje <code>OPENAI_API_KEY</code>. Napsaný text se bez AI vloží jako název úkolu.</p>
-        {% endif %}
-        <div class="d-flex gap-2 mb-2">
-          <button type="button" class="btn btn-danger btn-lg flex-grow-1" id="rec-btn" {{ 'disabled' if not settings.openai_enabled() }}>⏺️ Nahrávat</button>
-          <label class="btn btn-outline-secondary btn-lg mb-0" title="Nahrát zvukový soubor">
-            📁<input type="file" accept="audio/*" id="audio-file" hidden {{ 'disabled' if not settings.openai_enabled() }}>
+        <h2 class="h6 mb-1">Nadiktujte úkol</h2>
+        <p class="small text-body-secondary mb-1" id="rec-label">
+          {% if settings.openai_enabled() %}Klepněte na mikrofon a mluvte. AI vyplní formulář.
+          {% else %}Hlas vyžaduje nastavený OPENAI_API_KEY.{% endif %}
+        </p>
+        <button type="button" class="mic-btn" id="rec-btn" aria-label="Nahrávat"
+                {{ 'disabled' if not settings.openai_enabled() }}>
+          <span class="ico-mic" style="display:inline-flex">{{ icon('mic') }}</span>
+          <span class="ico-stop" style="display:none">{{ icon('stop') }}</span>
+        </button>
+        <div id="rec-status" class="small text-body-secondary mb-2" aria-live="polite"></div>
+        <textarea class="form-control mb-2" id="free-text" rows="3"
+          placeholder="…nebo napište: Slíbil jsem panu Novákovi z MF, že mu do pátku pošlu stanovisko."></textarea>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sky flex-grow-1" id="ai-text-btn">✨ Zpracovat text</button>
+          <label class="btn btn-soft btn-icon mb-0" title="Nahrát zvukový soubor">
+            <span style="width:20px;height:20px;display:inline-flex">{{ icon('upload') }}</span>
+            <input type="file" accept="audio/*" id="audio-file" hidden {{ 'disabled' if not settings.openai_enabled() }}>
           </label>
         </div>
-        <div id="rec-status" class="small text-body-secondary mb-2"></div>
-        <textarea class="form-control mb-2" id="free-text" rows="4"
-          placeholder="…nebo napište: Slíbil jsem panu Novákovi z MF, že mu do pátku pošlu stanovisko k rozpočtu."></textarea>
-        <button type="button" class="btn btn-primary w-100" id="ai-text-btn">✨ Zpracovat text</button>
-        <div id="ai-result" class="small mt-2"></div>
+        <div id="ai-result" class="small mt-2" aria-live="polite"></div>
       </div>
     </div>
   </div>
   <div class="col-lg-7">
-    <form method="post" class="card shadow-sm" id="task-form">
-      <div class="card-body">
+    <form method="post" id="task-form">
+      <div class="card"><div class="card-body">
         {{ csrf() }}
         {{ task_fields(values) }}
-      </div>
-      <div class="card-footer d-flex gap-2">
-        <button class="btn btn-primary btn-lg">💾 Uložit úkol</button>
-        <a class="btn btn-link" href="{{ url_for('tasks.new') }}">Vyčistit</a>
+      </div></div>
+      <div class="sticky-actions">
+        <button class="btn btn-primary btn-lg w-100">Uložit úkol</button>
       </div>
     </form>
   </div>
@@ -54,4 +59,5 @@
 {% block scripts %}
 <script>window.AI_EXTRACT_URL = "{{ url_for('tasks.ai_extract') }}";</script>
 <script src="{{ url_for('static', filename='js/recorder.js') }}"></script>
+{% if request.args.get('voice') %}<script>document.getElementById('voice').scrollIntoView({block: 'center'});</script>{% endif %}
 {% endblock %}

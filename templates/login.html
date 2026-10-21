@@ -1,22 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Přihlášení · AssistPlanner{% endblock %}
-{% block content %}
-<div class="row justify-content-center mt-5">
-  <div class="col-sm-9 col-md-6 col-lg-4">
-    <div class="card shadow-sm">
+{% block title %}Přihlášení · {{ settings.APP_NAME }}{% endblock %}
+{% block body %}
+<main class="login-wrap">
+  <div class="login-card">
+    <div class="card">
       <div class="card-body p-4">
-        <h1 class="h4 mb-4 text-center">🗂️ AssistPlanner</h1>
+        <img class="logo" src="{{ url_for('static', filename='img/logo-full.png') }}" alt="{{ settings.APP_NAME }} – {{ settings.APP_TAGLINE }}">
         <form method="post">
           <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-          <label class="form-label">Přihlásit jako</label>
-          <div class="btn-group w-100 mb-3" role="group">
+          <div class="form-label">Kdo se přihlašuje?</div>
+          <div class="role-pick mb-3">
             {% for role in UserRole %}
-              <input type="radio" class="btn-check" name="role" id="role-{{ role.name }}" value="{{ role.name }}" {{ 'checked' if loop.first }}>
-              <label class="btn btn-outline-primary btn-lg" for="role-{{ role.name }}">{{ role.value }}</label>
+              <input type="radio" name="role" id="role-{{ role.name }}" value="{{ role.name }}" {{ 'checked' if loop.first }}>
+              <label for="role-{{ role.name }}"><span class="ico">{{ '👔' if role.name == 'DEPUTY' else '🗂️' }}</span>{{ role.value }}</label>
             {% endfor %}
           </div>
           <label class="form-label" for="password">Heslo</label>
-          <input type="password" class="form-control form-control-lg mb-3" id="password" name="password" autocomplete="current-password">
+          <input type="password" class="form-control mb-3" id="password" name="password" autocomplete="current-password">
           <button class="btn btn-primary btn-lg w-100">Přihlásit</button>
         </form>
         {% if passwordless %}
@@ -24,6 +24,7 @@
         {% endif %}
       </div>
     </div>
+    <p class="text-center small text-body-secondary mt-3">Tip: v telefonu přidejte {{ settings.APP_NAME }} na plochu („Přidat na plochu“) – otevře se jako aplikace.</p>
   </div>
-</div>
+</main>
 {% endblock %}

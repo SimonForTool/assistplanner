@@ -14,6 +14,8 @@ def _env(name: str, default: str = "") -> str:
 
 
 # --- Aplikace ---
+APP_NAME = "Syncho"
+APP_TAGLINE = "Assistant Planner"
 
 
 def _secret_key() -> str:
