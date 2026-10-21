@@ -1,8 +1,9 @@
-streamlit>=1.50
+Flask>=3.0
+Flask-SQLAlchemy>=3.1
 SQLAlchemy>=2.0
 python-dotenv>=1.0
 openai>=1.50
 msal>=1.28
 requests>=2.31
-pandas>=2.0
 openpyxl>=3.1
+tzdata>=2024.1

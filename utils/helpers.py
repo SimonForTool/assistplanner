@@ -1,34 +1,21 @@
-"""Formátování, práce s daty a stav Streamlit session."""
+"""Formátování, práce s daty a pomocné funkce pro šablony."""
 from datetime import date, datetime, time, timedelta, timezone
 
-import streamlit as st
-
 import config
-from database.models import Priority, TaskStatus, UserRole
+from models import Priority, TaskStatus
 
-PRIORITY_COLORS = {
-    Priority.LOW: "#6c757d",
-    Priority.MEDIUM: "#0d6efd",
-    Priority.HIGH: "#fd7e14",
-    Priority.URGENT: "#dc3545",
+# Bootstrap 5 barvy odznaků
+PRIORITY_BADGES = {
+    Priority.LOW: "secondary",
+    Priority.MEDIUM: "primary",
+    Priority.HIGH: "warning",
+    Priority.URGENT: "danger",
 }
-STATUS_COLORS = {
-    TaskStatus.OPEN: "#0d6efd",
-    TaskStatus.IN_PROGRESS: "#fd7e14",
-    TaskStatus.CLOSED: "#198754",
-    TaskStatus.CANCELLED: "#6c757d",
-}
-PRIORITY_ICONS = {
-    Priority.LOW: "⚪",
-    Priority.MEDIUM: "🔵",
-    Priority.HIGH: "🟠",
-    Priority.URGENT: "🔴",
-}
-STATUS_ICONS = {
-    TaskStatus.OPEN: "🆕",
-    TaskStatus.IN_PROGRESS: "⏳",
-    TaskStatus.CLOSED: "✅",
-    TaskStatus.CANCELLED: "🚫",
+STATUS_BADGES = {
+    TaskStatus.OPEN: "primary",
+    TaskStatus.IN_PROGRESS: "warning",
+    TaskStatus.CLOSED: "success",
+    TaskStatus.CANCELLED: "secondary",
 }
 ACTIVE_STATUSES = (TaskStatus.OPEN, TaskStatus.IN_PROGRESS)
 
@@ -76,40 +63,9 @@ def parse_dt(value: str | None) -> datetime | None:
     return None
 
 
-# --- Odznaky ---
-
-def badge(text: str, color: str) -> str:
-    return (f"<span style='background:{color};color:#fff;padding:2px 8px;"
-            f"border-radius:10px;font-size:0.8em;white-space:nowrap'>{text}</span>")
-
-
-def priority_badge(p: Priority) -> str:
-    return badge(p.value, PRIORITY_COLORS[p])
-
-
-def status_badge(s: TaskStatus) -> str:
-    return badge(s.value, STATUS_COLORS[s])
-
-
-def priority_label(p: Priority) -> str:
-    return f"{PRIORITY_ICONS[p]} {p.value}"
-
-
-def status_label(s: TaskStatus) -> str:
-    return f"{STATUS_ICONS[s]} {s.value}"
-
-
-# --- Session state ---
-
-def current_user() -> UserRole | None:
-    return st.session_state.get("user_role")
-
-
-def flash(message: str, kind: str = "success") -> None:
-    """Zpráva zobrazená po st.rerun()."""
-    st.session_state.setdefault("_flash", []).append((kind, message))
-
-
-def show_flashes() -> None:
-    for kind, msg in st.session_state.pop("_flash", []):
-        getattr(st, kind)(msg)
+def enum_by_name(enum_cls, name: str | None, default=None):
+    """Bezpečný převod jména z formuláře (např. 'URGENT') na člen enumu."""
+    try:
+        return enum_cls[name] if name else default
+    except KeyError:
+        return default

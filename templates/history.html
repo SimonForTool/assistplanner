@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Historie změn · AssistPlanner{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">🕓 Historie změn</h1>
+<form class="card card-body mb-3 py-2" method="get">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-5"><label class="form-label small mb-1">Hledat (kód, název, změny)</label>
+      <input class="form-control" name="q" value="{{ args.get('q', '') }}" placeholder="např. ÚKOL-12"></div>
+    <div class="col-6 col-md-3"><label class="form-label small mb-1">Uživatel</label>
+      <select class="form-select" name="user"><option value="">Všichni</option>
+        {% for r in UserRole %}<option value="{{ r.name }}" {{ 'selected' if args.get('user') == r.name }}>{{ r.value }}</option>{% endfor %}
+      </select></div>
+    <div class="col-6 col-md-2"><label class="form-label small mb-1">Akce</label>
+      <select class="form-select" name="action"><option value="">Všechny</option>
+        {% for a in actions %}<option {{ 'selected' if args.get('action') == a }}>{{ a }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary flex-grow-1">Filtrovat</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('history.export_csv', **args) }}" title="Export CSV">⬇️</a></div>
+  </div>
+</form>
+<div class="card card-body shadow-sm">
+  {% with history = entries, show_task = true %}{% include "_history_table.html" %}{% endwith %}
+</div>
+<p class="small text-body-secondary mt-2">{{ entries|length }} záznamů</p>
+{% endblock %}

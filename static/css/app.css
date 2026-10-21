@@ -1,0 +1,13 @@
+.bg-primary-dark { background: #1f4e79; }
+.kpi .fs-2 { line-height: 1.1; }
+.template-btn { padding-top: .75rem; padding-bottom: .75rem; }
+.task-table td { padding-top: .6rem; padding-bottom: .6rem; }
+.text-pre { white-space: pre-line; }
+.commitment.border-danger { border-width: 2px; }
+#rec-btn.recording { animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .6; } }
+.ai-filled { transition: background-color 1.5s; background-color: #fff3cd !important; }
+@media (max-width: 575.98px) {
+  h1.h3 { font-size: 1.35rem; }
+  .btn-lg { font-size: 1.05rem; }
+}

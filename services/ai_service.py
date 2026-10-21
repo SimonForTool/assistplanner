@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 
 import config
-from database.models import Priority, TaskType
+from models import Priority, TaskType
 from utils.helpers import fmt_dt, now_local
 
 log = logging.getLogger(__name__)

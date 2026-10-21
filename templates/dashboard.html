@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% from "_macros.html" import priority_badge, status_badge, csrf, export_links with context %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0">📋 Přehled · {{ today.strftime('%d.%m.%Y') }}</h1>
+  <a class="btn btn-primary" href="{{ url_for('tasks.new') }}">➕ Nový úkol</a>
+</div>
+
+<div class="row g-3 mb-3">
+  {% for label, value, color in [
+      ('📅 Dnes k termínu', kpis.due_today, 'primary'),
+      ('⚠️ Po termínu', kpis.overdue, 'danger'),
+      ('🐢 Otevřeno > ' ~ settings.AGING_DAYS ~ ' dní', kpis.aging, 'secondary'),
+      ('🔥 Vysoká / urgentní', kpis.hot, 'warning')] %}
+  <div class="col-6 col-lg-3">
+    <div class="card kpi h-100" style="border-left: 4px solid var(--bs-{{ color }})">
+      <div class="card-body py-2">
+        <div class="small text-body-secondary">{{ label }}</div>
+        <div class="fs-2 fw-semibold">{{ value }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card mb-4 shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h5 mb-0">☀️ Ranní briefing</h2>
+      <button class="btn btn-sm btn-outline-primary" id="briefing-refresh">🔄 Generovat znovu</button>
+    </div>
+    <div id="briefing-body"><div class="placeholder-glow"><span class="placeholder col-10"></span><span class="placeholder col-8"></span><span class="placeholder col-9"></span></div></div>
+    <div id="briefing-note" class="small text-body-secondary mt-2"></div>
+  </div>
+</div>
+
+<h2 class="h5">Úkoly</h2>
+<form class="card card-body mb-3 py-2" method="get">
+  <input type="hidden" name="f" value="1">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label small mb-1" for="q">🔎 Hledat</label>
+      <input class="form-control" id="q" name="q" value="{{ filters.search }}" placeholder="název, osoba, místo, ÚKOL-…">
+    </div>
+    <div class="col-md-8">
+      <div class="small mb-1">Stav · Priorita · Zadal(a)</div>
+      <div class="d-flex flex-wrap gap-1">
+        {% for s in TaskStatus %}
+          <input type="checkbox" class="btn-check" name="status" value="{{ s.name }}" id="fs-{{ s.name }}" {{ 'checked' if s in filters.statuses }}>
+          <label class="btn btn-sm btn-outline-{{ STATUS_BADGES[s] }}" for="fs-{{ s.name }}">{{ s.value }}</label>
+        {% endfor %}
+        <span class="vr mx-1"></span>
+        {% for p in Priority %}
+          <input type="checkbox" class="btn-check" name="priority" value="{{ p.name }}" id="fp-{{ p.name }}" {{ 'checked' if p in filters.priorities }}>
+          <label class="btn btn-sm btn-outline-{{ PRIORITY_BADGES[p] }}" for="fp-{{ p.name }}">{{ p.value }}</label>
+        {% endfor %}
+        <span class="vr mx-1"></span>
+        {% for r in UserRole %}
+          <input type="checkbox" class="btn-check" name="creator" value="{{ r.name }}" id="fc-{{ r.name }}" {{ 'checked' if r in filters.creators }}>
+          <label class="btn btn-sm btn-outline-dark" for="fc-{{ r.name }}">{{ r.value }}</label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="col-12 d-flex gap-2">
+      <button class="btn btn-sm btn-primary">Filtrovat</button>
+      <a class="btn btn-sm btn-link" href="{{ url_for('dashboard.index') }}">Zrušit filtry</a>
+      <div class="ms-auto">{{ export_links() }}</div>
+    </div>
+  </div>
+</form>
+
+{% if tasks %}
+<div class="table-responsive card shadow-sm">
+  <table class="table table-hover align-middle mb-0 task-table">
+    <thead class="table-light">
+      <tr><th>ID</th><th>Název</th><th class="d-none d-md-table-cell">Zadal(a)</th><th>Priorita</th><th>Stav</th><th>Termín</th><th class="d-none d-lg-table-cell">Místo</th><th class="text-end">Akce</th></tr>
+    </thead>
+    <tbody>
+    {% for t in tasks %}
+      <tr class="{{ 'table-danger' if is_overdue(t) }}">
+        <td class="text-nowrap"><a href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.code }}</a></td>
+        <td>
+          <a class="text-reset text-decoration-none fw-medium" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a>
+          {% if t.is_commitment %}<span class="badge text-bg-info ms-1">🤝 {{ t.assignee_target or 'závazek' }}</span>{% endif %}
+        </td>
+        <td class="d-none d-md-table-cell">{{ t.creator.value }}</td>
+        <td>{{ priority_badge(t.priority) }}</td>
+        <td>{{ status_badge(t.status) }}</td>
+        <td class="text-nowrap">{{ '⚠️ ' if is_overdue(t) }}{{ t.due_date|dt }}</td>
+        <td class="d-none d-lg-table-cell">{{ t.location or '' }}</td>
+        <td class="text-end text-nowrap">
+          {% if t.status not in [TaskStatus.CLOSED, TaskStatus.CANCELLED] %}
+          <form method="post" action="{{ url_for('tasks.set_status', task_id=t.id) }}" class="d-inline">
+            {{ csrf() }}<input type="hidden" name="status" value="CLOSED">
+            <input type="hidden" name="next" value="{{ request.full_path }}">
+            <button class="btn btn-sm btn-outline-success" title="Uzavřít">✅</button>
+          </form>
+          {% endif %}
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tasks.detail', task_id=t.id) }}" title="Detail">✏️</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="small text-body-secondary mt-2">{{ tasks|length }} úkolů</p>
+{% else %}
+<div class="alert alert-info">Žádné úkoly neodpovídají filtru.</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadBriefing(refresh) {
+  const body = document.getElementById('briefing-body');
+  const note = document.getElementById('briefing-note');
+  if (refresh) body.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Připravuji briefing…';
+  try {
+    const r = await fetch('{{ url_for("dashboard.briefing") }}' + (refresh ? '?refresh=1' : ''));
+    const data = await r.json();
+    body.innerHTML = data.html;  // HTML je escapované na serveru
+    note.textContent = [data.ai_used ? '' : 'Sestaveno bez AI (chybí OPENAI_API_KEY nebo AI neodpověděla).',
+                        data.warning || ''].filter(Boolean).join(' ');
+  } catch (e) {
+    body.textContent = 'Briefing se nepodařilo načíst.';
+  }
+}
+document.getElementById('briefing-refresh').addEventListener('click', () => loadBriefing(true));
+loadBriefing(false);
+</script>
+{% endblock %}

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import requests
 
 import config
-from database.models import UserRole
+from models import UserRole
 
 log = logging.getLogger(__name__)
 

@@ -1,20 +1,60 @@
-# Assistant Planner
+# AssistPlanner
 
-Streamlit aplikace pro náměstka a jeho asistentku: ranní briefing, úkoly a závazky („Co komu slíbil“),
-hlasové zadávání s AI, synchronizace s Outlook kalendářem, notifikace a auditní stopa všech změn.
+Webová aplikace (Flask + Bootstrap 5) pro náměstka a jeho asistentku: ranní briefing, úkoly
+a závazky („Co komu slíbil“), hlasové zadávání s AI, synchronizace s Outlook kalendářem,
+notifikace a auditní stopa všech změn. Připravená pro **PythonAnywhere**.
 
-## Spuštění
+## Lokální spuštění
 
-Na Windows stačí dvakrát kliknout na `SPUSTIT.bat`. Ručně:
+Windows: dvakrát klikněte na `SPUSTIT.bat` a otevřete http://localhost:5000.
+
+Ručně:
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env        # doplňte hesla a případně API klíče
-python -m database.connection   # volitelné: založí DB a ukázková data
-streamlit run app.py
+python app.py               # http://localhost:5000
 ```
 
-Všechny integrace jsou volitelné. Bez klíčů aplikace běží v omezeném režimu:
+## Nasazení na PythonAnywhere
+
+1. **Bash konzole** (Consoles → Bash):
+   ```bash
+   git clone https://github.com/SimonForTool/assistplanner.git
+   cd assistplanner
+   mkvirtualenv --python=python3.10 assistplanner
+   pip install -r requirements.txt
+   cp .env.example .env
+   python -c "import secrets; print(secrets.token_hex(32))"   # výsledek vložte do SECRET_KEY
+   nano .env                                                  # hesla, SECRET_KEY, API klíče
+   ```
+2. **Web → Add a new web app → Manual configuration → Python 3.10.**
+3. V sekci **Virtualenv** zadejte `/home/UZIVATEL/.virtualenvs/assistplanner`.
+4. Otevřete **WSGI configuration file** a celý jeho obsah nahraďte:
+   ```python
+   import sys
+   path = "/home/UZIVATEL/assistplanner"
+   if path not in sys.path:
+       sys.path.insert(0, path)
+   from wsgi import application  # noqa
+   ```
+5. V sekci **Static files** přidejte URL `/static/` → adresář `/home/UZIVATEL/assistplanner/static`.
+6. Klikněte na **Reload**. Aplikace běží na `https://UZIVATEL.pythonanywhere.com`.
+7. *(Volitelné)* **Tasks** → plánovaná úloha (např. každou hodinu) pro upozornění na závazky
+   i ve chvíli, kdy aplikaci nikdo nemá otevřenou:
+   ```bash
+   cd /home/UZIVATEL/assistplanner && /home/UZIVATEL/.virtualenvs/assistplanner/bin/flask --app wsgi check-deadlines
+   ```
+
+`UZIVATEL` nahraďte svým uživatelským jménem na PythonAnywhere. Aktualizace kódu:
+`cd ~/assistplanner && git pull` a pak **Reload** na záložce Web.
+
+> Bezplatný účet PythonAnywhere povoluje odchozí spojení jen na schválené domény. OpenAI,
+> Microsoft Graph i Telegram na seznamu jsou; vlastní SMTP server nebo webhook být nemusí.
+
+## Integrace
+
+Všechny jsou volitelné. Bez klíčů aplikace běží v omezeném režimu:
 
 | Integrace | Bez konfigurace |
 |---|---|
@@ -25,25 +65,26 @@ Všechny integrace jsou volitelné. Bez klíčů aplikace běží v omezeném re
 ## Struktura
 
 ```
-app.py                     vstup, přihlášení, navigace
-config.py                  proměnné prostředí
-database/models.py         Task, TaskHistory + enumy
-database/connection.py     engine, session, init + seed
-services/task_service.py   CRUD s auditem, sync kalendáře, notifikace (UI volá jen tuto vrstvu)
-services/ai_service.py     Whisper, strukturované zadání (JSON schema), ranní briefing
-services/outlook_service.py MS Graph – vytvoření / úprava / smazání událostí
-services/notify_service.py Telegram, webhook, e-mail
-ui/                        přehled, nový úkol, závazky, historie
-utils/helpers.py           formátování, data, odznaky, session state
+wsgi.py                      WSGI vstup (application) pro PythonAnywhere
+app.py                       application factory, CSRF, CLI příkazy
+config.py                    proměnné prostředí
+models.py                    Task, TaskHistory + enumy (Flask-SQLAlchemy)
+routes/                      blueprinty: auth, dashboard, tasks, commitments, history
+services/task_service.py     CRUD s auditem, sync kalendáře, notifikace (routy volají jen tuto vrstvu)
+services/ai_service.py       Whisper, strukturované zadání (JSON schema), ranní briefing
+services/outlook_service.py  MS Graph – vytvoření / úprava / smazání událostí
+services/notify_service.py   Telegram, webhook, e-mail
+templates/                   Jinja2 + Bootstrap 5
+static/js/recorder.js        nahrávání hlasu (MediaRecorder) a předvyplnění formuláře
 ```
 
 ## Chování
 
 - **Kalendář:** událost existuje, dokud má úkol zaškrtnutý kalendář, termín a stav Otevřeno/Probíhá.
-  Uzavření, zrušení, smazání nebo odškrtnutí událost v Outlooku smaže; změna názvu/termínu/místa ji aktualizuje.
-  Graph vyžaduje App Registration s aplikačním oprávněním `Calendars.ReadWrite`.
+  Uzavření, zrušení, smazání nebo odškrtnutí událost v Outlooku smaže; změna názvu/termínu/místa ji
+  aktualizuje. Graph vyžaduje App Registration s aplikačním oprávněním `Calendars.ReadWrite`.
 - **Notifikace:** asistentka vytvoří (nebo změní na) urgentní úkol; závazek má termín do 24 h
-  (kontrola nejvýše jednou za 10 minut, každý závazek se hlásí jen jednou, po změně termínu znovu).
+  (každý závazek se hlásí jen jednou, po změně termínu znovu).
 - **Audit:** každé vytvoření, úprava, změna stavu/termínu a smazání se zapíše do `task_history`
   i s tím, kdo změnu provedl. Záznamy smazaných úkolů zůstávají.
-- **PostgreSQL / Supabase:** stačí změnit `DATABASE_URL` (a doinstalovat ovladač, např. `psycopg`).
+- **Nahrávání hlasu** v prohlížeči vyžaduje HTTPS (PythonAnywhere ho má) nebo `localhost`.

@@ -1,100 +1,113 @@
-"""Assistant Planner – vstupní bod Streamlit aplikace.
+"""Flask application factory pro AssistPlanner.
 
-Spuštění:  streamlit run app.py
+Lokální spuštění:   python app.py          (http://localhost:5000)
+PythonAnywhere:     viz wsgi.py a README.md
 """
-import hmac
 import logging
+import secrets
+import time
 
-import streamlit as st
+from flask import Flask, abort, request, session
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 import config
-from database.connection import init_db
-from database.models import UserRole
+from models import Priority, TaskStatus, TaskType, UserRole, db
 from services import task_service
-from ui import commitments, dashboard, history, task_form
-from utils.helpers import current_user, show_flashes
+from utils import helpers
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+log = logging.getLogger(__name__)
 
-st.set_page_config(page_title="Assistant Planner", page_icon="🗂️", layout="wide")
-
-st.markdown("""
-<style>
-  div[data-testid="stMetric"] {background:#f5f8fc;border-radius:10px;padding:10px 14px;}
-  div[data-testid="stHorizontalBlock"] button {min-height:3rem;}
-  @media (max-width: 640px) { h1, h2 {font-size:1.4rem !important;} }
-</style>
-""", unsafe_allow_html=True)
+DEADLINE_CHECK_INTERVAL = 600  # s
+_last_deadline_check = 0.0
 
 
-@st.cache_resource
-def _init() -> bool:
-    init_db()
-    return True
+@event.listens_for(Engine, "connect")
+def _sqlite_foreign_keys(dbapi_conn, _):
+    # SQLite bez tohoto ignoruje ON DELETE SET NULL v historii
+    if type(dbapi_conn).__module__.startswith("sqlite3"):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")
+        cur.close()
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def _deadline_check() -> int:
-    """Kontrola blížících se závazků nejvýše jednou za 10 minut (deduplikace je i v DB)."""
-    try:
-        return task_service.check_deadline_notifications()
-    except Exception as exc:
-        logging.getLogger(__name__).warning("Kontrola termínů selhala: %s", exc)
-        return 0
+def csrf_token() -> str:
+    if "_csrf" not in session:
+        session["_csrf"] = secrets.token_urlsafe(32)
+    return session["_csrf"]
 
 
-PASSWORDS = {UserRole.DEPUTY: config.DEPUTY_PASSWORD, UserRole.ASSISTANT: config.ASSISTANT_PASSWORD}
-PAGES = {
-    "📋 Přehled": dashboard.render,
-    "➕ Nový úkol": task_form.render,
-    "🤝 Co komu slíbil": commitments.render,
-    "🕓 Historie změn": history.render,
-}
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.config.update(
+        SECRET_KEY=config.SECRET_KEY,
+        SQLALCHEMY_DATABASE_URI=config.DATABASE_URL,
+        SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
+        MAX_CONTENT_LENGTH=config.MAX_UPLOAD_MB * 1024 * 1024,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+    )
+    db.init_app(app)
+
+    from routes import auth, commitments, dashboard, history, tasks
+    for bp in (auth.bp, dashboard.bp, tasks.bp, commitments.bp, history.bp):
+        app.register_blueprint(bp)
+
+    with app.app_context():
+        db.create_all()
+        if config.SEED_DEMO_DATA:
+            task_service.seed_demo_data()
+
+    @app.before_request
+    def _csrf_protect():
+        if request.method == "POST":
+            sent = request.form.get("_csrf") or request.headers.get("X-CSRF-Token")
+            if not sent or not secrets.compare_digest(sent, session.get("_csrf", "")):
+                abort(400, "Neplatný bezpečnostní token formuláře – obnovte stránku.")
+
+    @app.before_request
+    def _deadline_check():
+        # PythonAnywhere nemá trvale běžící proces; kontrolu spouštíme při provozu
+        # (nejvýše jednou za 10 minut) a navíc ji lze plánovat příkazem `flask check-deadlines`.
+        global _last_deadline_check
+        if session.get("role") and time.monotonic() - _last_deadline_check > DEADLINE_CHECK_INTERVAL:
+            _last_deadline_check = time.monotonic()
+            try:
+                task_service.check_deadline_notifications()
+            except Exception as exc:
+                log.warning("Kontrola termínů selhala: %s", exc)
+
+    @app.context_processor
+    def _template_globals():
+        return {
+            "csrf_token": csrf_token,
+            "current_role": auth.current_role(),
+            "Priority": Priority,
+            "TaskStatus": TaskStatus,
+            "TaskType": TaskType,
+            "UserRole": UserRole,
+            "PRIORITY_BADGES": helpers.PRIORITY_BADGES,
+            "STATUS_BADGES": helpers.STATUS_BADGES,
+            "is_overdue": task_service.is_overdue,
+            "settings": config,
+        }
+
+    app.jinja_env.filters["dt"] = helpers.fmt_dt
+    app.jinja_env.filters["local"] = helpers.utc_to_local
+
+    @app.cli.command("check-deadlines")
+    def _check_deadlines_cmd():
+        """Pošle upozornění na závazky s termínem do 24 h (pro plánovanou úlohu)."""
+        print(f"Odesláno upozornění: {task_service.check_deadline_notifications()}")
+
+    @app.cli.command("seed")
+    def _seed_cmd():
+        """Naplní prázdnou databázi ukázkovými daty."""
+        print("Hotovo." if task_service.seed_demo_data() else "Databáze není prázdná.")
+
+    return app
 
 
-def login() -> None:
-    st.title("🗂️ Assistant Planner")
-    with st.form("login"):
-        role = st.radio("Přihlásit jako", list(UserRole), format_func=lambda r: r.value, horizontal=True)
-        password = st.text_input("Heslo", type="password")
-        if st.form_submit_button("Přihlásit", type="primary"):
-            expected = PASSWORDS[role]
-            if not expected or hmac.compare_digest(password.encode(), expected.encode()):
-                st.session_state["user_role"] = role
-                st.rerun()
-            st.error("Nesprávné heslo.")
-    if not all(PASSWORDS.values()):
-        st.caption("⚠️ Některá role nemá nastavené heslo v `.env` – přihlášení bez hesla.")
-
-
-def sidebar() -> str:
-    user = current_user()
-    with st.sidebar:
-        st.markdown(f"### 🗂️ Assistant Planner\nPřihlášen(a): **{user.value}**")
-        page = st.radio("Navigace", list(PAGES), label_visibility="collapsed")
-        st.divider()
-        st.caption("Integrace")
-        st.caption(("🟢" if config.openai_enabled() else "⚪") + " OpenAI (hlas, AI)")
-        st.caption(("🟢" if config.graph_enabled() else "⚪") + " Outlook kalendář"
-                   + ("" if config.graph_enabled() else " – mock"))
-        notif = config.TELEGRAM_BOT_TOKEN or config.NOTIFY_WEBHOOK_URL or config.SMTP_HOST
-        st.caption(("🟢" if notif else "⚪") + " Notifikace" + ("" if notif else " – jen log"))
-        st.divider()
-        if st.button("Odhlásit", width="stretch"):
-            st.session_state.clear()
-            st.rerun()
-    return page
-
-
-def main() -> None:
-    _init()
-    if current_user() is None:
-        login()
-        return
-    _deadline_check()
-    page = sidebar()
-    show_flashes()
-    PAGES[page]()
-
-
-main()
+if __name__ == "__main__":
+    create_app().run(debug=True)

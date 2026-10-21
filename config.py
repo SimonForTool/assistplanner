@@ -14,12 +14,29 @@ def _env(name: str, default: str = "") -> str:
 
 
 # --- Aplikace ---
+
+
+def _secret_key() -> str:
+    """SECRET_KEY z .env, jinak náhodný klíč uložený v souboru (přežije restart serveru)."""
+    key = _env("SECRET_KEY")
+    if key:
+        return key
+    path = BASE_DIR / ".secret_key"
+    if not path.exists():
+        import secrets
+        path.write_text(secrets.token_hex(32))
+    return path.read_text().strip()
+
+
+SECRET_KEY = _secret_key()
 DEPUTY_PASSWORD = _env("DEPUTY_PASSWORD")
 ASSISTANT_PASSWORD = _env("ASSISTANT_PASSWORD")
-DATABASE_URL = _env("DATABASE_URL", f"sqlite:///{BASE_DIR / 'assistant_planner.db'}")
+DATABASE_URL = _env("DATABASE_URL", f"sqlite:///{BASE_DIR / 'assistplanner.db'}")
 TIMEZONE = ZoneInfo(_env("APP_TIMEZONE", "Europe/Prague"))
 SEED_DEMO_DATA = _env("SEED_DEMO_DATA", "1") == "1"
 AGING_DAYS = 7
+# Max. velikost nahrávky / uploadu (Whisper přijme nejvýše 25 MB)
+MAX_UPLOAD_MB = 25
 
 # --- OpenAI ---
 OPENAI_API_KEY = _env("OPENAI_API_KEY")

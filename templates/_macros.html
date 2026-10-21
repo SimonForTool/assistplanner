@@ -1,0 +1,86 @@
+{% macro priority_badge(p) -%}
+  <span class="badge text-bg-{{ PRIORITY_BADGES[p] }}">{{ p.value }}</span>
+{%- endmacro %}
+
+{% macro status_badge(s) -%}
+  <span class="badge text-bg-{{ STATUS_BADGES[s] }}">{{ s.value }}</span>
+{%- endmacro %}
+
+{% macro csrf() -%}
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+{%- endmacro %}
+
+{# Pole úkolu sdílená formulářem pro nový úkol i úpravou. v: dict hodnot #}
+{% macro task_fields(v, show_status=false) %}
+  {% set task_type = v.get('task_type') or TaskType.STANDARD %}
+  {% set priority = v.get('priority') or Priority.MEDIUM %}
+  {% set status = v.get('status') or TaskStatus.OPEN %}
+  {% set due = v.get('due_date') %}
+  <div class="row g-3">
+    <div class="col-12">
+      <label class="form-label" for="title">Název *</label>
+      <input class="form-control form-control-lg" id="title" name="title" required maxlength="255"
+             value="{{ v.get('title') or '' }}">
+    </div>
+    <div class="col-sm-6">
+      <label class="form-label" for="task_type">Typ</label>
+      <select class="form-select" id="task_type" name="task_type">
+        {% for t in TaskType %}<option value="{{ t.name }}" {{ 'selected' if t == task_type }}>{{ t.value }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-6">
+      <label class="form-label" for="priority">Priorita</label>
+      <select class="form-select" id="priority" name="priority">
+        {% for p in Priority %}<option value="{{ p.name }}" {{ 'selected' if p == priority }}>{{ p.value }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-6">
+      <label class="form-label" for="assignee_target">Komu slíbeno / pro koho</label>
+      <input class="form-control" id="assignee_target" name="assignee_target" maxlength="255"
+             value="{{ v.get('assignee_target') or '' }}">
+    </div>
+    <div class="col-sm-6">
+      <label class="form-label" for="location">Místo</label>
+      <input class="form-control" id="location" name="location" maxlength="255"
+             value="{{ v.get('location') or '' }}">
+    </div>
+    <div class="{{ 'col-sm-6' if show_status else 'col-12' }}">
+      <label class="form-label" for="due_date">Termín</label>
+      <input type="datetime-local" class="form-control" id="due_date" name="due_date" step="900"
+             value="{{ due.strftime('%Y-%m-%dT%H:%M') if due else '' }}">
+    </div>
+    {% if show_status %}
+    <div class="col-sm-6">
+      <label class="form-label" for="status">Stav</label>
+      <select class="form-select" id="status" name="status">
+        {% for s in TaskStatus %}<option value="{{ s.name }}" {{ 'selected' if s == status }}>{{ s.value }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="col-12">
+      <label class="form-label" for="description">Popis / poznámka</label>
+      <textarea class="form-control" id="description" name="description" rows="3">{{ v.get('description') or '' }}</textarea>
+    </div>
+    <div class="col-sm-6">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="sync_deputy_cal" name="sync_deputy_cal" {{ 'checked' if v.get('sync_deputy_cal') }}>
+        <label class="form-check-label" for="sync_deputy_cal">📆 Přidat do kalendáře náměstka</label>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="sync_assistant_cal" name="sync_assistant_cal" {{ 'checked' if v.get('sync_assistant_cal') }}>
+        <label class="form-check-label" for="sync_assistant_cal">📆 Přidat do kalendáře asistentky</label>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro export_links(scope=none) -%}
+  {% set args = request.args.to_dict(flat=false) %}
+  {% if scope %}{% set _ = args.update({'scope': [scope]}) %}{% endif %}
+  <div class="btn-group btn-group-sm">
+    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.export_csv', **args) }}">⬇️ CSV</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard.export_xlsx', **args) }}">⬇️ Excel</a>
+  </div>
+{%- endmacro %}

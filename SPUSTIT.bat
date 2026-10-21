@@ -25,8 +25,9 @@ if errorlevel 1 (
 if not exist .env copy .env.example .env >nul
 
 echo.
-echo Aplikace startuje na http://localhost:8501
+echo Aplikace startuje na http://localhost:5000
 echo Toto okno nechte otevrene, zavrenim se aplikace vypne.
 echo.
-python -m streamlit run app.py
+start "" http://localhost:5000
+python app.py
 pause

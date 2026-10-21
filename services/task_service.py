@@ -3,17 +3,28 @@
 UI volá výhradně tyto funkce, aby se žádná změna neobešla bez záznamu v TaskHistory.
 """
 import logging
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
 
-from database.connection import get_session
-from database.models import Priority, Task, TaskHistory, TaskStatus, TaskType, UserRole, utcnow
+from models import Priority, Task, TaskHistory, TaskStatus, TaskType, UserRole, db, utcnow
 from services import notify_service
 from services.outlook_service import get_outlook
 from utils.helpers import ACTIVE_STATUSES, fmt_dt, now_local
 
 log = logging.getLogger(__name__)
+
+
+@contextmanager
+def get_session():
+    """Transakce nad session Flask-SQLAlchemy (commit / rollback)."""
+    try:
+        yield db.session
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
 
 EDITABLE_FIELDS = {
     "title": "Název",
@@ -126,16 +137,14 @@ def check_deadline_notifications() -> int:
 # --- CRUD ---
 
 def list_tasks(include_inactive: bool = True) -> list[Task]:
-    with get_session() as s:
-        q = select(Task).order_by(Task.due_date.is_(None), Task.due_date, Task.id)
-        if not include_inactive:
-            q = q.where(Task.status.in_(ACTIVE_STATUSES))
-        return list(s.scalars(q).all())
+    q = select(Task).order_by(Task.due_date.is_(None), Task.due_date, Task.id)
+    if not include_inactive:
+        q = q.where(Task.status.in_(ACTIVE_STATUSES))
+    return list(db.session.scalars(q).all())
 
 
 def get_task(task_id: int) -> Task | None:
-    with get_session() as s:
-        return s.get(Task, task_id)
+    return db.session.get(Task, task_id)
 
 
 def create_task(data: dict, user: UserRole) -> tuple[Task, list[str]]:
@@ -197,8 +206,63 @@ def delete_task(task_id: int, user: UserRole) -> list[str]:
 
 
 def get_history(task_id: int | None = None, limit: int = 500) -> list[TaskHistory]:
+    q = select(TaskHistory).order_by(TaskHistory.timestamp.desc(), TaskHistory.id.desc())
+    if task_id is not None:
+        q = q.where(TaskHistory.task_id == task_id)
+    return list(db.session.scalars(q.limit(limit)).all())
+
+
+# --- Filtry a ukazatele (sdílí přehled, závazky a export) ---
+
+def is_overdue(t: Task) -> bool:
+    return t.status in ACTIVE_STATUSES and t.due_date is not None and t.due_date < now_local()
+
+
+def is_aging(t: Task, days: int) -> bool:
+    return t.status in ACTIVE_STATUSES and t.created_at < utcnow() - timedelta(days=days)
+
+
+def filter_tasks(tasks: list[Task], search: str = "", statuses=(), priorities=(),
+                 creators=(), task_type: TaskType | None = None) -> list[Task]:
+    s = search.strip().lower()
+    return [
+        t for t in tasks
+        if (not statuses or t.status in statuses)
+        and (not priorities or t.priority in priorities)
+        and (not creators or t.creator in creators)
+        and (task_type is None or t.task_type == task_type)
+        and (not s or s in " ".join(filter(None, [t.code, t.title, t.description,
+                                                   t.assignee_target, t.location])).lower())
+    ]
+
+
+# --- Ukázková data ---
+
+def seed_demo_data() -> bool:
+    """Naplní prázdnou databázi několika ukázkovými úkoly. Vrací True, pokud plnila."""
+    if db.session.scalar(select(Task.id).limit(1)) is not None:
+        return False
+    today = now_local().replace(second=0, microsecond=0)
+    created_old = utcnow() - timedelta(days=10)
+    demo = [
+        Task(title="Porada vedení odboru", creator=UserRole.ASSISTANT,
+             location="Zasedačka 3.12", priority=Priority.HIGH,
+             due_date=today.replace(hour=10, minute=0)),
+        Task(title="Poslat stanovisko k rozpočtu", task_type=TaskType.COMMITMENT,
+             assignee_target="Ing. Novák (MF)", creator=UserRole.DEPUTY,
+             priority=Priority.URGENT, due_date=today + timedelta(hours=20)),
+        Task(title="Telefonát s hejtmanem", assignee_target="Hejtman kraje",
+             creator=UserRole.ASSISTANT, due_date=today.replace(hour=14, minute=30)),
+        Task(title="Podklady pro výbor", creator=UserRole.DEPUTY, priority=Priority.LOW,
+             status=TaskStatus.IN_PROGRESS, due_date=today + timedelta(days=3),
+             created_at=created_old),
+        Task(title="Ozvat se ohledně dotačního programu", task_type=TaskType.COMMITMENT,
+             assignee_target="Starostka Mgr. Dvořáková", creator=UserRole.DEPUTY,
+             due_date=today - timedelta(days=1), created_at=created_old),
+    ]
     with get_session() as s:
-        q = select(TaskHistory).order_by(TaskHistory.timestamp.desc(), TaskHistory.id.desc())
-        if task_id is not None:
-            q = q.where(TaskHistory.task_id == task_id)
-        return list(s.scalars(q.limit(limit)).all())
+        s.add_all(demo)
+        s.flush()
+        for t in demo:
+            _log(s, t, t.creator, "Vytvořeno", "Ukázková data")
+    return True

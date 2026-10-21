@@ -1,0 +1,25 @@
+{% if history %}
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Čas</th>{% if show_task %}<th>Úkol</th>{% endif %}<th>Uživatel</th><th>Akce</th><th>Změny</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr>
+        <td class="text-nowrap">{{ h.timestamp|local|dt }}</td>
+        {% if show_task %}
+        <td class="text-nowrap">
+          {% if h.task_id %}<a href="{{ url_for('tasks.detail', task_id=h.task_id) }}">{{ h.task_code }}</a>{% else %}<span class="text-body-secondary">{{ h.task_code }}</span>{% endif %}
+          <div class="small text-body-secondary">{{ h.task_title or '' }}</div>
+        </td>
+        {% endif %}
+        <td>{{ h.user.value }}</td>
+        <td><span class="badge text-bg-{{ 'danger' if h.action == 'Smazáno' else 'success' if h.action == 'Vytvořeno' else 'light border' }}">{{ h.action }}</span></td>
+        <td class="small">{{ h.changes_summary or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-body-secondary mb-0">Žádné záznamy.</p>
+{% endif %}
