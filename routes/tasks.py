@@ -1,4 +1,5 @@
 """CRUD úkolů, rychlé šablony a hlasové / AI zadání."""
+import logging
 from datetime import timedelta
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
@@ -6,10 +7,11 @@ from flask import Blueprint, abort, flash, jsonify, redirect, render_template, r
 import config
 from models import Priority, TaskStatus, TaskType
 from routes.auth import current_role, login_required, safe_next
-from services import ai_service, task_service
+from services import ai_service, czech_parser, task_service
 from utils.helpers import enum_by_name, now_local, parse_dt
 
 bp = Blueprint("tasks", __name__, url_prefix="/tasks")
+log = logging.getLogger(__name__)
 
 
 def _template(title: str, priority: Priority, days: int, hour: int, deputy_cal: bool) -> dict:
@@ -81,7 +83,11 @@ def new():
 @bp.route("/ai-extract", methods=["POST"])
 @login_required
 def ai_extract():
-    """Přijme nahrávku (pole `audio`) nebo text (`text`) a vrátí předvyplněná pole formuláře."""
+    """Přijme nahrávku (pole `audio`) nebo text (`text`) a vrátí předvyplněná pole formuláře.
+
+    S OPENAI_API_KEY: Whisper + GPT. Bez klíče (nebo při chybě AI) se text rozebere
+    pravidly v services/czech_parser.py; hlas pak přepisuje přímo prohlížeč.
+    """
     audio = request.files.get("audio")
     text = request.form.get("text", "").strip()
     try:
@@ -89,16 +95,23 @@ def ai_extract():
             content = audio.read()
             if content:
                 text = ai_service.transcribe_audio(content, audio.filename or "nahravka.webm")
-        if not text:
-            return jsonify(error="Nahrávka ani text nebyly zadány."), 400
-        if not config.openai_enabled():
-            return jsonify(fields={"title": text[:80], "description": text}, transcript=text,
-                           ai_used=False)
-        result = ai_service.extract_task(text)
     except ai_service.AIUnavailable as exc:
-        return jsonify(error=str(exc)), 400
+        return jsonify(error=f"{exc} Použijte mikrofon v prohlížeči nebo napište text."), 400
     except Exception as exc:
-        return jsonify(error=f"Zpracování selhalo: {exc}"), 502
+        return jsonify(error=f"Přepis nahrávky selhal: {exc}"), 502
+    if not text:
+        return jsonify(error="Nahrávka ani text nebyly zadány."), 400
+
+    ai_used = False
+    result = None
+    if config.openai_enabled():
+        try:
+            result = ai_service.extract_task(text)
+            ai_used = True
+        except Exception as exc:
+            log.warning("AI strukturování selhalo, použita pravidla: %s", exc)
+    if result is None:
+        result = czech_parser.extract_task(text)
 
     due = parse_dt(result.get("due_date"))
     fields = {
@@ -112,7 +125,7 @@ def ai_extract():
         "location": result.get("location") or "",
         "due_date": due.strftime("%Y-%m-%dT%H:%M") if due else "",
     }
-    return jsonify(fields=fields, transcript=text, ai_used=True)
+    return jsonify(fields=fields, transcript=text, ai_used=ai_used)
 
 
 def _get_or_404(task_id: int):

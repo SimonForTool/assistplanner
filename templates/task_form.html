@@ -20,23 +20,24 @@
       <div class="card-body">
         <h2 class="h6 mb-1">Nadiktujte úkol</h2>
         <p class="small text-body-secondary mb-1" id="rec-label">
-          {% if settings.openai_enabled() %}Klepněte na mikrofon a mluvte. AI vyplní formulář.
-          {% else %}Hlas vyžaduje nastavený OPENAI_API_KEY.{% endif %}
+          Klepněte na mikrofon a řekněte, co je potřeba – údaje vpravo se vyplní samy.
         </p>
         <button type="button" class="mic-btn" id="rec-btn" aria-label="Nahrávat"
-                {{ 'disabled' if not settings.openai_enabled() }}>
+                data-whisper="{{ '1' if settings.openai_enabled() else '' }}">
           <span class="ico-mic" style="display:inline-flex">{{ icon('mic') }}</span>
           <span class="ico-stop" style="display:none">{{ icon('stop') }}</span>
         </button>
         <div id="rec-status" class="small text-body-secondary mb-2" aria-live="polite"></div>
         <textarea class="form-control mb-2" id="free-text" rows="3"
-          placeholder="…nebo napište: Slíbil jsem panu Novákovi z MF, že mu do pátku pošlu stanovisko."></textarea>
+          placeholder="Např.: Slíbil jsem panu Novákovi z MF, že mu do pátku pošlu stanovisko."></textarea>
         <div class="d-flex gap-2">
-          <button type="button" class="btn btn-sky flex-grow-1" id="ai-text-btn">✨ Zpracovat text</button>
+          <button type="button" class="btn btn-sky flex-grow-1" id="ai-text-btn">✨ Vyplnit z textu</button>
+          {% if settings.openai_enabled() %}
           <label class="btn btn-soft btn-icon mb-0" title="Nahrát zvukový soubor">
             <span style="width:20px;height:20px;display:inline-flex">{{ icon('upload') }}</span>
-            <input type="file" accept="audio/*" id="audio-file" hidden {{ 'disabled' if not settings.openai_enabled() }}>
+            <input type="file" accept="audio/*" id="audio-file" hidden>
           </label>
+          {% endif %}
         </div>
         <div id="ai-result" class="small mt-2" aria-live="polite"></div>
       </div>
