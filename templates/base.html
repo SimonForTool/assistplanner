@@ -31,6 +31,7 @@
     </a>
     <nav class="appbar-nav">
       <a class="{{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.index') }}">Přehled</a>
+      <a class="{{ 'active' if ep.startswith('calendar') }}" href="{{ url_for('calendar.index') }}">Kalendář</a>
       <a class="{{ 'active' if ep.startswith('commitments') }}" href="{{ url_for('commitments.index') }}">Co komu slíbil</a>
       <a class="{{ 'active' if ep.startswith('history') }}" href="{{ url_for('history.index') }}">Historie</a>
       <a class="{{ 'active' if ep == 'tasks.new' }}" href="{{ url_for('tasks.new') }}">+ Nový úkol</a>
@@ -78,10 +79,10 @@
 <nav class="tabbar" aria-label="Navigace">
   <div class="tabbar-inner">
     <a class="{{ 'active' if ep.startswith('dashboard') }}" href="{{ url_for('dashboard.index') }}">{{ icon('home') }}Přehled</a>
-    <a class="{{ 'active' if ep.startswith('commitments') }}" href="{{ url_for('commitments.index') }}">{{ icon('promise') }}Závazky</a>
+    <a class="{{ 'active' if ep.startswith('calendar') }}" href="{{ url_for('calendar.index') }}">{{ icon('calendar') }}Kalendář</a>
     <a class="fab {{ 'active' if ep == 'tasks.new' }}" href="{{ url_for('tasks.new') }}" aria-label="Nový úkol">{{ icon('plus') }}</a>
+    <a class="{{ 'active' if ep.startswith('commitments') }}" href="{{ url_for('commitments.index') }}">{{ icon('promise') }}Závazky</a>
     <a class="{{ 'active' if ep.startswith('history') }}" href="{{ url_for('history.index') }}">{{ icon('history') }}Historie</a>
-    <a href="{{ url_for('tasks.new', voice=1) }}" class="{{ 'active' if ep == 'tasks.new' and request.args.get('voice') }}">{{ icon('mic') }}Diktovat</a>
   </div>
 </nav>
 {% endif %}

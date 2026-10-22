@@ -21,11 +21,24 @@
     {% if task.assignee_target %}<div class="info-item"><span>👤</span><span><span class="lbl">{{ 'Komu slíbeno' if task.is_commitment else 'Pro koho' }}</span>{{ task.assignee_target }}</span></div>{% endif %}
     {% if task.location %}<div class="info-item"><span>📍</span><span><span class="lbl">Místo</span>{{ task.location }}</span></div>{% endif %}
     <div class="info-item"><span>✍️</span><span><span class="lbl">Zadal(a)</span>{{ task.creator.value }}</span></div>
-    {% if task.outlook_event_id_deputy or task.outlook_event_id_assistant %}
-    <div class="info-item"><span>📆</span><span><span class="lbl">V kalendáři</span>
-      {{ [task.outlook_event_id_deputy and 'Náměstek', task.outlook_event_id_assistant and 'Asistentka']|select|join(', ') }}</span></div>
-    {% endif %}
+
   </div>
+
+  {% set cal_rows = [(UserRole.DEPUTY, task.outlook_event_id_deputy, settings.MS_DEPUTY_MAILBOX),
+                     (UserRole.ASSISTANT, task.outlook_event_id_assistant, settings.MS_ASSISTANT_MAILBOX)] %}
+  {% if task.outlook_event_id_deputy or task.outlook_event_id_assistant %}
+  <div class="cal-sync">
+    <span class="small fw-semibold text-body-secondary">📆 Outlook:</span>
+    {% for role, event_id, mailbox in cal_rows if event_id %}
+      <form method="post" action="{{ url_for('tasks.remove_from_calendar', task_id=task.id) }}" class="d-flex align-items-center gap-2"
+            onsubmit="return confirm('Odebrat termín z Outlook kalendáře ({{ role.value }})?');">
+        {{ csrf() }}<input type="hidden" name="role" value="{{ role.name }}">
+        <span class="tag tone-sky" title="{{ mailbox }}">{{ role.value }}{{ ' · zkušební režim' if event_id.startswith('mock-') }}</span>
+        <button class="btn btn-soft-danger btn-sm">Odebrat z kalendáře</button>
+      </form>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <div class="status-actions">
     {% for label, status, style in [('✅ Uzavřít', TaskStatus.CLOSED, 'btn-soft-success'), ('⏳ Probíhá', TaskStatus.IN_PROGRESS, 'btn-soft'),

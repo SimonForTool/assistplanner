@@ -96,13 +96,15 @@
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_deputy_cal" name="sync_deputy_cal" {{ 'checked' if v.get('sync_deputy_cal') }}>
-        <label class="form-check-label" for="sync_deputy_cal">Do kalendáře náměstka</label>
+        <label class="form-check-label" for="sync_deputy_cal">Do kalendáře náměstka
+          {% if settings.MS_DEPUTY_MAILBOX %}<span class="d-block small text-body-secondary">{{ settings.MS_DEPUTY_MAILBOX }}{{ '' if settings.graph_enabled() else ' · Outlook nepřipojen' }}</span>{% endif %}</label>
       </div>
     </div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_assistant_cal" name="sync_assistant_cal" {{ 'checked' if v.get('sync_assistant_cal') }}>
-        <label class="form-check-label" for="sync_assistant_cal">Do kalendáře asistentky</label>
+        <label class="form-check-label" for="sync_assistant_cal">Do kalendáře asistentky
+          {% if settings.MS_ASSISTANT_MAILBOX %}<span class="d-block small text-body-secondary">{{ settings.MS_ASSISTANT_MAILBOX }}{{ '' if settings.graph_enabled() else ' · Outlook nepřipojen' }}</span>{% endif %}</label>
       </div>
     </div>
   </div>

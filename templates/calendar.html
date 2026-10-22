@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import task_card with context %}
+{% from "_icons.html" import icon %}
+{% block title %}Kalendář · {{ settings.APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Kalendář</h1>
+  {% if selected.date != today %}
+    <a class="btn btn-soft btn-sm" href="{{ url_for('calendar.index') }}">Dnes</a>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6 col-xl-5">
+    <section class="card cal">
+      <div class="cal-head">
+        <a class="btn btn-soft btn-icon" href="{{ url_for('calendar.index', d=prev_month.isoformat()) }}" aria-label="Předchozí měsíc">
+          <span style="width:20px;height:20px;display:inline-flex">{{ icon('back') }}</span></a>
+        <div class="cal-title">{{ month_label }}</div>
+        <a class="btn btn-soft btn-icon" href="{{ url_for('calendar.index', d=next_month.isoformat()) }}" aria-label="Další měsíc">
+          <span style="width:20px;height:20px;display:inline-flex;transform:rotate(180deg)">{{ icon('back') }}</span></a>
+      </div>
+      <div class="cal-grid cal-weekdays">
+        {% for w in weekdays %}<div class="{{ 'off' if loop.index > 5 }}">{{ w }}</div>{% endfor %}
+      </div>
+      {% for week in weeks %}
+      <div class="cal-grid">
+        {% for day in week %}
+          {% set active = day.tasks|selectattr('status', 'in', [TaskStatus.OPEN, TaskStatus.IN_PROGRESS])|list %}
+          <a class="cal-day {{ 'out' if not day.in_month }} {{ 'today' if day.is_today }} {{ 'sel' if day.date == selected.date }} {{ 'off' if day.day_off }}"
+             href="{{ url_for('calendar.index', d=day.date.isoformat()) }}" title="{{ day.holiday or day.nameday }}">
+            <span class="num">{{ day.date.day }}</span>
+            <span class="dots">
+              {% for t in active[:3] %}<i class="dot-{{ PRIORITY_BADGES[t.priority] }}"></i>{% endfor %}
+              {% if active|length > 3 %}<b>+</b>{% endif %}
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </section>
+  </div>
+
+  <div class="col-lg-6 col-xl-7">
+    <section class="day-head">
+      <a class="btn btn-soft btn-icon" href="{{ url_for('calendar.index', d=prev_day.isoformat()) }}" aria-label="Předchozí den">
+        <span style="width:20px;height:20px;display:inline-flex">{{ icon('back') }}</span></a>
+      <div class="text-center flex-grow-1">
+        <div class="day-title">{{ long_date|capitalize }}</div>
+        <div class="day-sub">
+          {% if selected.is_today %}<span class="tag tone-sky">Dnes</span>{% endif %}
+          {% if selected.holiday %}<span class="tag tone-red">🇨🇿 {{ selected.holiday }}</span>{% endif %}
+          {% if selected.nameday %}<span>🎉 Svátek: <strong>{{ selected.nameday }}</strong></span>{% endif %}
+        </div>
+      </div>
+      <a class="btn btn-soft btn-icon" href="{{ url_for('calendar.index', d=next_day.isoformat()) }}" aria-label="Další den">
+        <span style="width:20px;height:20px;display:inline-flex;transform:rotate(180deg)">{{ icon('back') }}</span></a>
+    </section>
+
+    {% if day_tasks %}
+      <div class="task-list one-col">
+        {% for t in day_tasks %}{{ task_card(t) }}{% endfor %}
+      </div>
+    {% else %}
+      <div class="empty card"><span class="emoji">{{ '🗓️' if not selected.is_past else '📭' }}</span>
+        {{ 'Na tento den nic naplánováno.' if not selected.is_past else 'Tento den nebyly žádné úkoly.' }}</div>
+    {% endif %}
+    {% if not selected.is_past %}
+      <a class="btn btn-primary w-100 mt-3" href="{{ url_for('tasks.new', date=selected.date.isoformat()) }}">+ Přidat úkol na tento den</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

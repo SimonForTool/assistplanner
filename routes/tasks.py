@@ -5,7 +5,7 @@ from datetime import timedelta
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 
 import config
-from models import Priority, TaskStatus, TaskType
+from models import Priority, TaskStatus, TaskType, UserRole
 from routes.auth import current_role, login_required, safe_next
 from services import ai_service, czech_parser, task_service
 from utils.helpers import enum_by_name, now_local, parse_dt
@@ -77,6 +77,10 @@ def new():
     values = tpl[2]() if tpl else {}
     if request.args.get("type") == "commitment":
         values["task_type"] = TaskType.COMMITMENT
+    day = parse_dt(request.args.get("date"))
+    if day:
+        due = values.get("due_date")
+        values["due_date"] = day.replace(hour=due.hour if due else 9, minute=due.minute if due else 0)
     return render_template("task_form.html", values=values, templates=TEMPLATES)
 
 
@@ -166,6 +170,22 @@ def set_status(task_id: int):
     _flash_warnings(warnings)
     flash(f"{task.code}: stav změněn na „{status.value}“.", "success")
     return redirect(safe_next(request.form.get("next"), url_for("tasks.detail", task_id=task.id)))
+
+
+@bp.route("/<int:task_id>/calendar/remove", methods=["POST"])
+@login_required
+def remove_from_calendar(task_id: int):
+    """Smaže událost z Outlook kalendáře vybrané role (úkol zůstává)."""
+    task = _get_or_404(task_id)
+    role = enum_by_name(UserRole, request.form.get("role"))
+    if role is None:
+        abort(400)
+    field = "sync_deputy_cal" if role == UserRole.DEPUTY else "sync_assistant_cal"
+    _, warnings = task_service.update_task(task.id, {field: False}, current_role())
+    _flash_warnings(warnings)
+    if not warnings:
+        flash(f"Termín byl odebrán z kalendáře ({role.value}).", "success")
+    return redirect(url_for("tasks.detail", task_id=task.id))
 
 
 @bp.route("/<int:task_id>/delete", methods=["POST"])

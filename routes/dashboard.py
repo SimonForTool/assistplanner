@@ -2,7 +2,7 @@
 import csv
 import io
 import re
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Blueprint, Response, jsonify, render_template, request
 from markupsafe import Markup, escape
@@ -12,6 +12,7 @@ from models import Priority, Task, TaskStatus, TaskType, UserRole
 from routes.auth import login_required
 from services import ai_service, task_service
 from services.outlook_service import get_outlook
+from utils import czech_calendar as cz
 from utils.helpers import ACTIVE_STATUSES, enum_by_name, fmt_dt, now_local, today_bounds
 
 bp = Blueprint("dashboard", __name__)
@@ -47,11 +48,26 @@ def kpis(tasks: list[Task]) -> dict:
 @bp.route("/")
 @login_required
 def index():
+    from routes.calendar import day_info, tasks_by_day
+
     tasks = task_service.list_tasks()
     filters = parse_filters(request.args)
     filtered = task_service.filter_tasks(tasks, **filters)
-    return render_template("dashboard.html", tasks=filtered, kpis=kpis(tasks),
-                           filters=filters, today=now_local())
+    now = now_local()
+    today = now.date()
+    by_day = tasks_by_day(t for t in tasks if t.status in ACTIVE_STATUSES)
+    strip = []
+    for offset in range(-3, 11):  # 3 dny zpět, 10 dní dopředu
+        d = today + timedelta(days=offset)
+        info = day_info(d, today)
+        info["count"] = len(by_day.get(d, []))
+        strip.append(info)
+    return render_template(
+        "dashboard.html", tasks=filtered, kpis=kpis(tasks), filters=filters, today=now,
+        greeting=cz.greeting(now), long_date=cz.fmt_long(today),
+        nameday=cz.nameday_sentence(today), holiday=cz.holiday(today),
+        tomorrow_nameday=cz.nameday(today + timedelta(days=1)), strip=strip,
+    )
 
 
 def _briefing_html(text: str) -> Markup:

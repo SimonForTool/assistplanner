@@ -322,3 +322,57 @@ textarea.form-control { min-height: auto; }
 .table-sy td { padding-top: .75rem; padding-bottom: .75rem; }
 
 .text-pre { white-space: pre-line; }
+
+/* ---------- Pozdrav a pás dnů na přehledu ---------- */
+.hello-line { font-size: .92rem; font-weight: 600; color: var(--sy-navy-900); margin-top: .35rem; display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.day-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+.day-strip::-webkit-scrollbar { display: none; }
+.strip-day {
+  flex: 0 0 56px; height: 76px; border-radius: 16px; background: var(--sy-surface); box-shadow: var(--sy-shadow);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  text-decoration: none; color: var(--sy-navy-900); scroll-snap-align: start;
+}
+.strip-day .wd { font-size: .7rem; font-weight: 600; color: var(--sy-muted); text-transform: uppercase; }
+.strip-day .num { font-size: 1.25rem; font-weight: 800; line-height: 1.1; }
+.strip-day .cnt { font-size: .7rem; font-weight: 700; color: var(--sy-sky); min-height: 1em; }
+.strip-day.off .num { color: var(--sy-red); }
+.strip-day.past { opacity: .55; }
+.strip-day.today { background: var(--sy-navy); }
+.strip-day.today .wd, .strip-day.today .num { color: #fff; }
+.strip-day.today .cnt { color: var(--sy-sky); }
+.strip-day.more { color: var(--sy-navy); background: var(--sy-sky-50); box-shadow: none; }
+
+/* ---------- Kalendář ---------- */
+.cal { padding: .9rem; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .6rem; }
+.cal-title { font-weight: 800; font-size: 1.15rem; color: var(--sy-navy-900); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.cal-weekdays div { text-align: center; font-size: .72rem; font-weight: 700; color: var(--sy-muted); padding: .2rem 0; }
+.cal-weekdays .off { color: var(--sy-red); }
+.cal-day {
+  aspect-ratio: 1 / 1; min-height: 44px; border-radius: 12px; text-decoration: none; color: var(--sy-navy-900);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; position: relative;
+}
+.cal-day:hover { background: var(--sy-sky-50); }
+.cal-day .num { font-weight: 700; font-size: .95rem; line-height: 1; }
+.cal-day .dots { display: flex; gap: 2px; height: 6px; align-items: center; }
+.cal-day .dots i { width: 6px; height: 6px; border-radius: 50%; display: block; }
+.cal-day .dots b { font-size: .6rem; line-height: 6px; color: var(--sy-muted); }
+.dot-red { background: var(--sy-red); }
+.dot-amber { background: var(--sy-amber); }
+.dot-sky { background: var(--sy-sky); }
+.dot-muted { background: #b3c1cf; }
+.cal-day.off .num { color: var(--sy-red); }
+.cal-day.out { opacity: .35; }
+.cal-day.today { box-shadow: inset 0 0 0 2px var(--sy-sky); }
+.cal-day.sel { background: var(--sy-navy); }
+.cal-day.sel .num { color: #fff; }
+.cal-day.sel .dot-sky { background: #fff; }
+.day-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+.day-title { font-weight: 800; font-size: 1.1rem; color: var(--sy-navy-900); }
+.day-sub { font-size: .85rem; color: var(--sy-muted); display: flex; flex-wrap: wrap; gap: .4rem; justify-content: center; align-items: center; margin-top: .2rem; }
+.task-list.one-col { grid-template-columns: 1fr; }
+
+/* Outlook v detailu */
+.cal-sync { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .75rem; }
+.cal-sync .tag { font-size: .78rem; }

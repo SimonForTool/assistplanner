@@ -1,15 +1,31 @@
 {% extends "base.html" %}
 {% from "_macros.html" import task_card, priority_badge, status_badge, export_links with context %}
 {% from "_icons.html" import icon %}
-{% set weekdays = ['pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota', 'neděle'] %}
 {% block content %}
 <div class="page-head">
   <div>
-    <div class="sub">{{ weekdays[today.weekday()]|capitalize }} {{ today.strftime('%d.%m.%Y') }}</div>
-    <h1>Dobrý den 👋</h1>
+    <div class="sub">{{ long_date|capitalize }}</div>
+    <h1>{{ greeting }} 👋</h1>
+    <div class="hello-line">
+      {% if holiday %}<span class="tag tone-red">🇨🇿 {{ holiday }}</span>{% endif %}
+      {% if nameday %}Dnes {{ nameday }} 🎉{% endif %}
+      {% if tomorrow_nameday %}<span class="text-body-secondary"> · zítra {{ tomorrow_nameday }}</span>{% endif %}
+    </div>
   </div>
   <a class="btn btn-primary d-none d-lg-inline-flex" href="{{ url_for('tasks.new') }}">+ Nový úkol</a>
 </div>
+
+<nav class="day-strip mb-3" aria-label="Dny">
+  {% for d in strip %}
+    <a class="strip-day {{ 'today' if d.is_today }} {{ 'past' if d.is_past }} {{ 'off' if d.day_off }}"
+       href="{{ url_for('calendar.index', d=d.date.isoformat()) }}" {% if d.is_today %}id="strip-today"{% endif %}>
+      <span class="wd">{{ d.weekday_short }}</span>
+      <span class="num">{{ d.date.day }}</span>
+      <span class="cnt">{{ d.count if d.count else '·' }}</span>
+    </a>
+  {% endfor %}
+  <a class="strip-day more" href="{{ url_for('calendar.index') }}"><span style="width:22px;height:22px;display:inline-flex">{{ icon('calendar') }}</span><span class="wd">Více</span></a>
+</nav>
 
 <div class="kpi-grid mb-3">
   {% for label, value, color, emoji, link in [
@@ -82,6 +98,10 @@
 
 {% block scripts %}
 <script>
+// Pás dnů: dnešek posuneme k levému okraji (ukáže 3 dny zpět)
+const st = document.getElementById('strip-today');
+if (st) st.parentElement.scrollLeft = Math.max(0, st.offsetLeft - st.parentElement.offsetLeft - 8 - 3 * (st.offsetWidth + 8));
+
 // Filtry se použijí hned po kliknutí na čip
 document.querySelectorAll('#filter-form .chip-check').forEach(el =>
   el.addEventListener('change', () => el.form.submit()));

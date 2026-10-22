@@ -52,8 +52,8 @@ def create_app() -> Flask:
     )
     db.init_app(app)
 
-    from routes import auth, commitments, dashboard, history, tasks
-    for bp in (auth.bp, dashboard.bp, tasks.bp, commitments.bp, history.bp):
+    from routes import auth, calendar, commitments, dashboard, history, tasks
+    for bp in (auth.bp, dashboard.bp, tasks.bp, calendar.bp, commitments.bp, history.bp):
         app.register_blueprint(bp)
 
     with app.app_context():
