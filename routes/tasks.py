@@ -120,7 +120,8 @@ def ai_extract():
     due = parse_dt(result.get("due_date"))
     fields = {
         "title": result.get("title") or text[:80],
-        "description": text,
+        # Poznámka z diktátu („do poznámky …“), jinak celý přepis pro dohledání
+        "description": result.get("description") or text,
         "task_type": next((t.name for t in TaskType if t.value == result.get("task_type")),
                           TaskType.STANDARD.name),
         "priority": next((p.name for p in Priority if p.value == result.get("priority")),

@@ -48,20 +48,39 @@ TASK_SCHEMA = {
             "priority": {"type": "string", "enum": [p.value for p in Priority]},
             "due_date": {"type": ["string", "null"],
                          "description": "Formát YYYY-MM-DD HH:MM nebo null"},
+            "description": {"type": ["string", "null"]},
         },
         "required": ["title", "task_type", "assignee_target", "location",
-                     "priority", "due_date"],
+                     "priority", "due_date", "description"],
     },
 }
 
-EXTRACT_PROMPT = """Jsi asistent náměstka. Z diktovaného textu vytáhni jeden úkol.
-- title: krátký výstižný název úkolu (max ~80 znaků), česky.
-- task_type: "{commitment}" pokud náměstek někomu něco slíbil / přislíbil / se zavázal; jinak "{standard}".
-- assignee_target: osoba/instituce, které je slíbeno nebo které se úkol týká, jinak null.
-- location: místo konání, jinak null.
-- priority: "Urgentní" jen při výslovné naléhavosti (hned, dnes, urgentně); "Vysoká" pro důležité; jinak "Střední".
-- due_date: termín ve formátu YYYY-MM-DD HH:MM, relativní výrazy (zítra, v pátek, příští týden) převeď vůči
-  aktuálnímu času {now} ({weekday}). Bez uvedeného času použij 09:00. Bez termínu null."""
+EXTRACT_PROMPT = """Jsi asistentka náměstka. Z diktovaného textu (často bez interpunkce a s malými
+písmeny z přepisu řeči) vytvoř přesné zadání jednoho úkolu.
+
+Pravidla:
+- title: krátký název ve tvaru „<Typ akce>: <osoba nebo téma>“, kde typ akce je jedno z:
+  Schůzka, Porada, Jednání, Telefonát, Příprava podkladů, Schválení, E-mail, Návštěva.
+  Pokud žádný nesedí, napiš stručný název činnosti v infinitivu („Poslat stanovisko k rozpočtu“).
+  Do názvu nedávej termín, místo ani pokyny typu „založ“, „vytvoř“.
+- assignee_target: osoba nebo instituce, které bylo něco slíbeno / které se úkol týká,
+  VŽDY v 1. pádě a se správnými velkými písmeny („Pavlu novotnému“ → „Pavel Novotný“,
+  „panu ministrovi zdravotnictví“ → „ministr zdravotnictví“). Oslovení pan/paní vynech. Jinak null.
+- task_type: "{commitment}" pokud náměstek něco slíbil / přislíbil / se zavázal nebo je uvedeno, komu
+  je slíbeno; jinak "{standard}".
+- location: místo konání v 1. pádě s velkým počátečním písmenem („v salonku Bratislava“ /
+  „místo bude salonek Bratislava“ → „Salonek Bratislava“). Jinak null.
+- due_date: termín ve formátu YYYY-MM-DD HH:MM. Relativní výrazy (zítra, v pátek, příští týden)
+  převeď vůči aktuálnímu času {now} ({weekday}). Bez uvedeného času použij 09:00. Bez termínu null.
+- priority: "Urgentní" jen při výslovné naléhavosti (hned, dnes, urgentně); "Vysoká" pro důležité
+  nebo výslovně „priorita vysoká“; „Nízká“ pro „nespěchá“; jinak "Střední".
+- description: text, který má jít „do poznámky“ / „do popisu“, jako větu s velkým písmenem
+  („do poznámky zajistit občerstvení“ → „Zajistit občerstvení“); jinak null.
+
+Příklad: „založ schůzku kterou jsem slíbil Pavlu novotnému místo bude salonek Bratislava termín
+24 října 2026 do poznámky zajistit občerstvení“ →
+title „Schůzka: Pavel Novotný“, assignee_target „Pavel Novotný“, task_type „{commitment}“,
+location „Salonek Bratislava“, due_date „2026-10-24 09:00“, description „Zajistit občerstvení“."""
 
 WEEKDAYS = ["pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle"]
 

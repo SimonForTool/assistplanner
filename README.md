@@ -74,7 +74,9 @@ models.py                    Task, TaskHistory + enumy (Flask-SQLAlchemy)
 routes/                      blueprinty: auth, dashboard, tasks, commitments, history
 services/task_service.py     CRUD s auditem, sync kalendáře, notifikace (routy volají jen tuto vrstvu)
 services/ai_service.py       Whisper, strukturované zadání (JSON schema), ranní briefing
-services/czech_parser.py     vyplnění úkolu z českého textu bez AI (termíny, priorita, osoba, místo)
+services/czech_parser.py     vyplnění úkolu z českého textu bez AI (termíny, priorita, osoba, místo, poznámka)
+services/czech_names.py      převod osob do 1. pádu („Pavlu novotnému“ → „Pavel Novotný“)
+tests/                       regresní testy diktátů: python -m pytest tests
 services/outlook_service.py  MS Graph – vytvoření / úprava / smazání událostí
 services/notify_service.py   Telegram, webhook, e-mail
 templates/                   Jinja2 + Bootstrap 5 (vlastní styl v static/css/app.css)

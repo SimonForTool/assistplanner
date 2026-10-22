@@ -10,6 +10,7 @@ import re
 from datetime import date, datetime, time, timedelta
 
 from models import Priority, TaskType
+from services.czech_names import to_nominative
 from utils.helpers import now_local
 
 # Kořeny dnů v týdnu (pokrývají pády: pátek / pátku, středa / středu / středy, ...)
@@ -76,7 +77,7 @@ def _parse_date(text: str, today: date) -> tuple[date | None, list[str]]:
         (r"\bdo\s+konce\s+týdne\b", lambda m: today + timedelta(days=max(0, 4 - today.weekday()))),
         (r"\b(\d{1,2})\.\s*(\d{1,2})\.(?:\s*(\d{4}))?", lambda m: _safe_date(
             int(m.group(3) or today.year), int(m.group(2)), int(m.group(1)), today, bool(m.group(3)))),
-        (r"\b(\d{1,2})\.\s*(" + "|".join(MONTHS) + r")(?:\s+(\d{4}))?", lambda m: _safe_date(
+        (r"\b(\d{1,2})\.?\s*(" + "|".join(MONTHS) + r")(?:\s+(\d{4}))?", lambda m: _safe_date(
             int(m.group(3) or today.year), MONTHS[m.group(2)], int(m.group(1)), today, bool(m.group(3)))),
     ]
     for pattern, fn in rules:
@@ -182,37 +183,182 @@ def _make_title(text: str, commitment: bool, remove: list[str]) -> str:
     return title or _capitalize(text[:80])
 
 
+# Klíčová slova strukturovaného diktátu: „… místo bude X, termín Y, do poznámky Z“
+SEGMENT_KEYS = [
+    ("location", r"\bmísto(?:\s+konání)?(?:\s+(?:bude|je|konání))?\s*:?"),
+    ("due", r"\b(?:termín|datum|kdy)(?:\s+(?:bude|je|:))?\s*:?"),
+    ("note", r"\b(?:do\s+poznámky|poznámka(?:\s+je)?|poznámku|do\s+popisu|popis)\s*:?"),
+    ("person", r"\bkomu(?:\s+slíbeno)?\s*:?"),
+    ("priority", r"\bpriorita(?:\s+(?:bude|je))?\s*:?"),
+    ("title", r"\bnázev(?:\s+(?:bude|je))?\s*:?"),
+]
+
+# Typ akce → začátek názvu („Schůzka: Pavel Novotný“)
+ACTIVITIES = [
+    (r"\bschůz\w*|\bsetkání\b|\bsejít\b|\bsejdeme\b|\bschůzk\w*", "Schůzka"),
+    (r"\bporad\w*", "Porada"),
+    (r"\bjednání\b|\bjednat\b", "Jednání"),
+    (r"\btelefon\w*|\bzavolat\b|\bzavolej\w*|\bvolat\b|\bhovor\w*", "Telefonát"),
+    (r"\bpodklad\w*", "Příprava podkladů"),
+    (r"\bschvál\w*|\bpodeps\w*|\bpodpis\w*", "Schválení"),
+    (r"\be-?mail\w*|\bodepsat\b|\bodpovědět\b", "E-mail"),
+    (r"\bnávštěv\w*|\bnavštívit\b", "Návštěva"),
+]
+COMMAND_RE = re.compile(r"^(?:prosím\s+)?(?:založ|založit|vytvoř|vytvořit|přidej|přidat|zapiš|zapsat|naplánuj|"
+                        r"naplánovat|udělej|nastav|dej|potřebuji|potřebuju|musím|mám)\b\s*", re.I)
+PERSON_STOP = (r"(?=\s*(?:,|;|\.(?!\s*[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])|\bže\b|\baby\b|\bkde\b|\bkdy\b|\bohledně\b|"
+               r"\bkvůli\b|\bo\b|\bna\b|\bv\b|\bve\b|\bdo\b|\bzítra\b|\bdnes\b|\bpozítří\b|$))")
+
+
+PLACE_NOMINATIVE = {
+    "zasedačce": "zasedačka", "zasedací": "zasedací", "kanceláři": "kancelář", "místnosti": "místnost",
+    "budově": "budova", "sále": "sál", "ministerstvu": "ministerstvo", "úřadě": "úřad", "úřadu": "úřad",
+    "radnici": "radnice", "hejtmanství": "hejtmanství", "kraji": "kraj", "salonku": "salonek",
+    "restauraci": "restaurace", "kavárně": "kavárna", "hotelu": "hotel", "sněmovně": "sněmovna",
+}
+
+
+def _segments(text: str) -> tuple[str, dict[str, str]]:
+    """Rozdělí diktát na úvod a pojmenované části podle klíčových slov."""
+    hits = []
+    for key, pattern in SEGMENT_KEYS:
+        for m in re.finditer(pattern, text, re.I):
+            hits.append((m.start(), m.end(), key))
+    hits.sort()
+    # Překrývající se nálezy (např. „termín“ uvnitř delší fráze) vynecháme
+    clean, last_end = [], -1
+    for start, end, key in hits:
+        if start >= last_end:
+            clean.append((start, end, key))
+            last_end = end
+    head = text[: clean[0][0]] if clean else text
+    parts: dict[str, str] = {}
+    for i, (start, end, key) in enumerate(clean):
+        stop = clean[i + 1][0] if i + 1 < len(clean) else len(text)
+        value = text[end:stop].strip(" ,.;:-–")
+        if value and key not in parts:
+            parts[key] = value
+    return head.strip(" ,.;:-–"), parts
+
+
+def _activity(text: str) -> str | None:
+    for pattern, label in ACTIVITIES:
+        if re.search(pattern, text, re.I):
+            return label
+    return None
+
+
+def _person_phrase(text: str, commitment: bool) -> str | None:
+    patterns = []
+    if commitment:
+        patterns += [
+            rf"(?:při)?slíbil[a]?\s+(?:jsem\s+|jsme\s+)?(?!že\b)(.+?){PERSON_STOP}",
+            rf"zavázal[a]?\s+(?:jsem\s+)?se\s+(.+?){PERSON_STOP}",
+        ]
+    patterns += [
+        # osoba musí začínat oslovením / funkcí nebo velkým písmenem (rozlišuje velikost písmen)
+        rf"(?i:\b(?:zavolat|zavolej\w*|volat|zatelefonovat|napsat|poslat|odeslat|předat|připomenout))\s+"
+        rf"((?:(?i:pan[ui]?|paní|kolegovi|kolegyni|ředitel\w*|starost\w*|hejtman\w*|ministr\w*|náměst\w*)\b"
+        rf"|[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])\S*(?:\s+\S+){{0,3}}?){PERSON_STOP}",
+        rf"\b(?:schůzk\w*|jednání|porad\w*|sejít\s+se|setkání|telefonát\w*|hovor)\s+(?:s|se)\s+(.+?){PERSON_STOP}",
+        rf"\bpro\s+((?:pan[a]?|paní|ředitel\w*|starost\w*|hejtman\w*|ministr\w*)\b.+?){PERSON_STOP}",
+    ]
+    for p in patterns:
+        m = re.search(p, text, 0 if p.startswith("(?i:") else re.I)
+        if m:
+            phrase = " ".join(m.group(1).split()[:5]).strip(" ,.")
+            if 2 <= len(phrase) <= 80 and not re.fullmatch(r"(?:mu|jí|jim|mi|to|že|jsem)", phrase, re.I):
+                return phrase
+    return None
+
+
+def _topic(text: str) -> str | None:
+    m = re.search(r"\b(ohledně|kvůli|k|ke|na téma|o)\s+(.+?)(?=\s*(?:,|;|\.|\bže\b|\bv\b|\bve\b|\bdo\b|$))", text, re.I)
+    if m and len(m.group(2).split()) <= 6:
+        return f"{m.group(1).lower()} {m.group(2)}"
+    return None
+
+
+def _clean_value(value: str) -> str:
+    value = re.sub(r"^(?:bude|je|by\s+měl[ao]?\s+být|v|ve|na)\s+", "", value.strip(), flags=re.I)
+    return _capitalize(value)
+
+
+def _priority(text: str) -> Priority:
+    word = text.strip().lower()
+    for prefix, prio in (("urgent", Priority.URGENT), ("vysok", Priority.HIGH), ("nízk", Priority.LOW),
+                         ("střed", Priority.MEDIUM), ("normál", Priority.MEDIUM)):
+        if word.startswith(prefix):  # hodnota z „priorita …“
+            return prio
+    if URGENT_RE.search(text):
+        return Priority.URGENT
+    if HIGH_RE.search(text):
+        return Priority.HIGH
+    if LOW_RE.search(text):
+        return Priority.LOW
+    return Priority.MEDIUM
+
+
 def extract_task(text: str, now: datetime | None = None) -> dict:
     now = now or now_local()
     text = " ".join(text.split())
-    commitment = bool(COMMITMENT_RE.search(text))
+    head, parts = _segments(text)
+    commitment = bool(COMMITMENT_RE.search(text)) or "person" in parts
 
-    priority = Priority.MEDIUM
-    if URGENT_RE.search(text):
-        priority = Priority.URGENT
-    elif HIGH_RE.search(text):
-        priority = Priority.HIGH
-    elif LOW_RE.search(text):
-        priority = Priority.LOW
+    priority = _priority(parts.get("priority") or text)
 
-    d, date_frags = _parse_date(text, now.date())
-    t, time_frags = _parse_time(text)
+    # Termín: přednostně z části „termín …“, jinak z celého textu (bez poznámky)
+    due_source = parts.get("due") or " ".join([head] + [v for k, v in parts.items() if k != "note"])
+    d, date_frags = _parse_date(due_source, now.date())
+    t, time_frags = _parse_time(due_source)
     due = None
     if d or t:
         due_date = d or (now.date() if t and t > now.time() else now.date() + timedelta(days=1))
         due = datetime.combine(due_date, t or time(9, 0))
 
-    person, person_frags = _parse_person(text, commitment)
-    location, loc_frags = _parse_location(text)
+    # Osoba: „komu …“, jinak z úvodní věty
+    phrase = parts.get("person") or _person_phrase(head, commitment) or _person_phrase(text, commitment)
+    person = to_nominative(phrase) if phrase else None
+    if person:
+        person = person[:1].upper() + person[1:] if person.split()[0][:1].islower() and \
+            person.split()[0].lower() not in ("ministr", "ředitel", "hejtman", "starosta", "předseda",
+                                               "náměstek", "ministryně", "ředitelka", "starostka",
+                                               "primátor", "senátor", "poslanec", "vedoucí") else person
 
-    remove = date_frags + time_frags + loc_frags + ([] if not commitment else [])
-    title = _make_title(text, commitment, remove)
+    # Místo: „místo …“, jinak typické obraty („v zasedačce 3.12“)
+    if "location" in parts:
+        location, loc_frags = _clean_value(parts["location"]), []
+    else:
+        location, loc_frags = _parse_location(head)
+    if location:
+        first, _, rest = location.partition(" ")
+        nom = PLACE_NOMINATIVE.get(first.lower())
+        location = _capitalize(f"{nom} {rest}".strip() if nom else location)
+
+    # Název: „název …“ > „<Typ akce>: <osoba / téma>“ > věta z diktátu
+    # Typ akce jen z hlavní věty – „slíbil jsem…, že pošlu zápis z porady“ není porada
+    main_clause = re.split(r"\bže\b", head, maxsplit=1, flags=re.I)[0]
+    activity = _activity(main_clause)
+    if "title" in parts:
+        title = _capitalize(parts["title"])
+    elif activity and (person or _topic(main_clause)):
+        detail = person or _topic(main_clause)
+        topic = _topic(main_clause) if person else None
+        title = f"{activity}: {detail}" + (f" – {topic}" if topic else "")
+    else:
+        head_clean = COMMAND_RE.sub("", head)
+        title = _make_title(head_clean or text, commitment, date_frags + time_frags + loc_frags)
+        if activity and not _activity(title):
+            title = f"{activity}: {title}"
+
+    note = _capitalize(parts["note"]) if "note" in parts else None
 
     return {
-        "title": title,
+        "title": title[:120],
         "task_type": (TaskType.COMMITMENT if commitment else TaskType.STANDARD).value,
         "assignee_target": person,
         "location": location,
         "priority": priority.value,
         "due_date": due.strftime("%Y-%m-%d %H:%M") if due else None,
+        "description": note,
     }
