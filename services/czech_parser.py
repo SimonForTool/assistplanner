@@ -361,4 +361,6 @@ def extract_task(text: str, now: datetime | None = None) -> dict:
         "priority": priority.value,
         "due_date": due.strftime("%Y-%m-%d %H:%M") if due else None,
         "description": note,
+        # text mimo klíčová slova („místo …“, „termín …“) – pro doplnění poznámky
+        "remainder": _capitalize(head) or None,
     }

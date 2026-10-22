@@ -59,7 +59,8 @@
 </div>
 <div class="tab-content">
   <div class="tab-pane fade show active" id="tab-edit">
-    <form method="post">
+    <div class="mb-3">{% with voice_filled = true %}{% include "_voice_panel.html" %}{% endwith %}</div>
+    <form method="post" id="task-form">
       <div class="card"><div class="card-body">
         {{ csrf() }}
         {{ task_fields(values, show_status=true) }}
@@ -75,4 +76,9 @@
     <div class="card"><div class="card-body">{% include "_history_table.html" %}</div></div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>window.AI_EXTRACT_URL = "{{ url_for('tasks.ai_extract') }}";</script>
+<script src="{{ url_for('static', filename='js/recorder.js') }}"></script>
 {% endblock %}

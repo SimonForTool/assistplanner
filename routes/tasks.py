@@ -132,6 +132,9 @@ def ai_extract():
     }
     if fields["assignee_target"]:
         fields["task_type"] = TaskType.COMMITMENT.name  # stejné pravidlo jako při uložení
+    # Text pro „Doplnit / Nahradit poznámku“: část „do poznámky …“, jinak diktát bez místa a termínu
+    note = result.get("description") or result.get("remainder") or text
+    fields["note"] = note[:1].upper() + note[1:]
     return jsonify(fields=fields, transcript=text, ai_used=ai_used)
 
 
