@@ -60,6 +60,7 @@ def create_app() -> Flask:
         db.create_all()
         if config.SEED_DEMO_DATA:
             task_service.seed_demo_data()
+        task_service.apply_commitment_rule_to_existing()
 
     @app.before_request
     def _csrf_protect():

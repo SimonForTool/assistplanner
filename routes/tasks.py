@@ -129,6 +129,8 @@ def ai_extract():
         "location": result.get("location") or "",
         "due_date": due.strftime("%Y-%m-%dT%H:%M") if due else "",
     }
+    if fields["assignee_target"]:
+        fields["task_type"] = TaskType.COMMITMENT.name  # stejné pravidlo jako při uložení
     return jsonify(fields=fields, transcript=text, ai_used=ai_used)
 
 

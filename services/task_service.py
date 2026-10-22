@@ -30,7 +30,7 @@ EDITABLE_FIELDS = {
     "title": "Název",
     "description": "Popis",
     "task_type": "Typ",
-    "assignee_target": "Komu / pro koho",
+    "assignee_target": "Komu slíbeno",
     "location": "Místo",
     "priority": "Priorita",
     "status": "Stav",
@@ -147,7 +147,31 @@ def get_task(task_id: int) -> Task | None:
     return db.session.get(Task, task_id)
 
 
+def _apply_commitment_rule(data: dict) -> dict:
+    """Vyplněné „Komu slíbeno“ = závazek (zobrazí se v „Co komu slíbil“)."""
+    if (data.get("assignee_target") or "").strip():
+        data = {**data, "task_type": TaskType.COMMITMENT}
+    return data
+
+
+def apply_commitment_rule_to_existing() -> int:
+    """Jednorázově převede starší úkoly s vyplněným „Komu slíbeno“ na závazky. Vrací počet."""
+    with get_session() as s:
+        tasks = s.scalars(select(Task).where(
+            Task.task_type == TaskType.STANDARD,
+            Task.assignee_target.is_not(None),
+            Task.assignee_target != "",
+        )).all()
+        for t in tasks:
+            t.task_type = TaskType.COMMITMENT
+            _log(s, t, t.creator, "Změna typu",
+                 f"Typ: {TaskType.STANDARD.value} → {TaskType.COMMITMENT.value} "
+                 "(automaticky – vyplněno „Komu slíbeno“)")
+    return len(tasks)
+
+
 def create_task(data: dict, user: UserRole) -> tuple[Task, list[str]]:
+    data = _apply_commitment_rule(data)
     with get_session() as s:
         task = Task(creator=user, **{k: v for k, v in data.items() if k in EDITABLE_FIELDS})
         s.add(task)
@@ -163,6 +187,7 @@ def create_task(data: dict, user: UserRole) -> tuple[Task, list[str]]:
 
 
 def update_task(task_id: int, data: dict, user: UserRole) -> tuple[Task | None, list[str]]:
+    data = _apply_commitment_rule(data)
     with get_session() as s:
         task = s.get(Task, task_id)
         if task is None:

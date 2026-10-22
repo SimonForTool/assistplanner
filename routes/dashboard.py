@@ -105,7 +105,7 @@ def briefing():
 
 # --- Export ---
 
-EXPORT_COLUMNS = ["ID", "Název", "Typ", "Komu / pro koho", "Místo", "Priorita", "Stav",
+EXPORT_COLUMNS = ["ID", "Název", "Typ", "Komu slíbeno", "Místo", "Priorita", "Stav",
                   "Termín", "Zadal(a)", "Popis"]
 
 

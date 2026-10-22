@@ -66,9 +66,11 @@
       </select>
     </div>
     <div class="col-sm-6">
-      <label class="form-label" for="assignee_target">Komu slíbeno / pro koho</label>
+      <label class="form-label" for="assignee_target">🤝 Komu slíbeno</label>
       <input class="form-control" id="assignee_target" name="assignee_target" maxlength="255"
-             value="{{ v.get('assignee_target') or '' }}">
+             value="{{ v.get('assignee_target') or '' }}"
+             oninput="if (this.value.trim()) this.form.elements.task_type.value = 'COMMITMENT'">
+      <div class="form-text small">Vyplněním se úkol zařadí do „Co komu slíbil“.</div>
     </div>
     <div class="col-sm-6">
       <label class="form-label" for="location">Místo</label>
