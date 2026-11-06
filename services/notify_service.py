@@ -224,15 +224,70 @@ def _ics(task, cancel: bool = False) -> bytes:
     return ("\r\n".join(lines) + "\r\n").encode("utf-8")
 
 
-def send_task_email(to: str, task, event: str, changes: str | None = None) -> None:
-    subject = f"{event}: {task.code} {task.title}"
-    body = _task_lines(task)
+def _task_url(task) -> str | None:
+    base = config.APP_URL
+    if not base:
+        from flask import has_request_context, request
+        base = request.url_root.rstrip("/") if has_request_context() else ""
+    return f"{base}/tasks/{task.id}" if base else None
+
+
+def _outlook_email(task, event: str, changes: str | None) -> tuple[str, str]:
+    """Předmět a text e-mailu s údaji v pořadí, v jakém se zapisují do události v Outlooku."""
+    from datetime import timedelta
+
+    from models import UserRole
+    from utils.czech_calendar import fmt_long
+
+    deleted = event == "Úkol smazán"
+    subject = f"{event}: {task.title}" + (f" – {task.due_date:%d.%m.%Y %H:%M}" if task.due_date else "")
+
+    rows = [("Předmět", task.title)]
+    if task.due_date:
+        end = task.due_date + timedelta(minutes=config.CALENDAR_EVENT_MINUTES)
+        rows += [("Datum", fmt_long(task.due_date.date())),
+                 ("Čas", f"{task.due_date:%H:%M} – {end:%H:%M}")]
+    else:
+        rows.append(("Termín", "neuveden"))
+    if task.location:
+        rows.append(("Místo", task.location))
+    if task.organization:
+        rows.append(("Organizace", task.organization + (f" / {task.subcategory}" if task.subcategory else "")))
+    if task.assignee_target:
+        rows.append(("Komu slíbeno", task.assignee_target))
+    if task.delegated_to:
+        rows.append(("Zadáno komu", task.delegated_to))
+    rows.append(("Priorita", task.priority.value))
+    width = max(len(label) for label, _ in rows) + 2
+
+    if deleted:
+        intro = "úkol byl smazán – pokud je zapsaný v kalendáři Outlook, odstraňte ho prosím."
+    elif event.startswith("Změna"):
+        intro = "úkol byl změněn – upravte prosím záznam v kalendáři Outlook."
+    elif task.is_private:
+        intro = "nový soukromý úkol:"
+    else:
+        intro = f"{UserRole.DEPUTY.value} zadává nový úkol. Údaje pro zápis do kalendáře Outlook:"
+
+    lines = ["Dobrý den,", "", intro, ""]
     if changes:
-        body = [f"Změny: {changes}", ""] + body
+        lines += [f"Co se změnilo: {changes}", ""]
+    lines += [f"{(label + ':').ljust(width)}{value}" for label, value in rows]
+    if task.description:
+        lines += ["", "Poznámka:", task.description]
+    url = None if deleted else _task_url(task)
+    if url:
+        lines += ["", f"Úkol v aplikaci: {url}"]
+    lines += ["", f"— {config.APP_NAME} · {task.code}"]
+    return subject, "\n".join(lines)
+
+
+def send_task_email(to: str, task, event: str, changes: str | None = None) -> None:
+    subject, text = _outlook_email(task, event, changes)
     attachments = []
-    if task.due_date and event != "Úkol smazán":
+    if config.EMAIL_ATTACH_ICS and task.due_date and event != "Úkol smazán":
         attachments.append((_ics(task), "text", "calendar", f"{task.code}.ics"))
-    deliver_email(to, subject, "\n".join(body), attachments)
+    deliver_email(to, subject, text, attachments)
 
 
 def send_task_sms(phone: str, task, event: str) -> None:

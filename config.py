@@ -88,6 +88,10 @@ SMTP_FROM = _env("SMTP_FROM")
 SMTP_FROM_NAME = _env("SMTP_FROM_NAME", "Syncho")
 # ssl (port 465) / starttls (port 587) / none; prázdné = podle portu
 SMTP_SECURITY = _env("SMTP_SECURITY").lower()
+# Příloha .ics (událost do kalendáře) v e-mailu s úkolem; výchozí vypnuto – údaje se zapisují ručně
+EMAIL_ATTACH_ICS = _env("EMAIL_ATTACH_ICS", "0") == "1"
+# Veřejná adresa aplikace pro odkaz v e-mailu (prázdné = zjistí se z požadavku)
+APP_URL = _env("APP_URL").rstrip("/")
 NOTIFY_EMAIL_TO = _env("NOTIFY_EMAIL_TO")
 
 

@@ -162,11 +162,12 @@
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="notify_email" name="notify_email" {{ 'checked' if v.get('notify_email', true) }}>
-        <label class="form-check-label" for="notify_email">✉️ Odeslat do e-mailu
+        <label class="form-check-label" for="notify_email">✉️ Odeslat e-mailem (údaje pro zápis do Outlooku)
           <span class="d-block small text-body-secondary" data-show-work {{ 'hidden' if private }}>{{ recipient(UserRole.ASSISTANT, 'email') }}</span>
           <span class="d-block small text-body-secondary" data-show-private {{ 'hidden' if not private }}>{{ recipient(UserRole.DEPUTY, 'email') }}</span></label>
       </div>
     </div>
+    {% if settings.sms_enabled() %}
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="notify_sms" name="notify_sms" {{ 'checked' if v.get('notify_sms', true) }}>
@@ -175,6 +176,10 @@
           <span class="d-block small text-body-secondary" data-show-private {{ 'hidden' if not private }}>{{ recipient(UserRole.DEPUTY, 'phone') }}</span></label>
       </div>
     </div>
+    {% elif v.get('notify_sms', true) %}
+    {# SMS služba není nastavená – přepínač skrýt, ale volbu u úkolu zachovat pro pozdější zapnutí #}
+    <input type="hidden" name="notify_sms" value="on">
+    {% endif %}
     {% if current_role == UserRole.DEPUTY %}
     <script>
       (function () {
