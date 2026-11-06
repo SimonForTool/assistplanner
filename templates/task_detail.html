@@ -29,6 +29,17 @@
 
   {% set cal_rows = [(UserRole.DEPUTY, task.outlook_event_id_deputy, settings.MS_DEPUTY_MAILBOX),
                      (UserRole.ASSISTANT, task.outlook_event_id_assistant, settings.MS_ASSISTANT_MAILBOX)] %}
+  {% if task.gcal_event_id %}
+  <div class="cal-sync">
+    <span class="small fw-semibold text-body-secondary">📅 Google kalendář:</span>
+    <form method="post" action="{{ url_for('tasks.remove_from_calendar', task_id=task.id) }}" class="d-flex align-items-center gap-2"
+          onsubmit="return confirm('Odebrat termín z Google kalendáře? Pozvaní hosté dostanou zrušení.');">
+      {{ csrf() }}<input type="hidden" name="role" value="GCAL">
+      <span class="tag tone-sky">{{ settings.GCAL_CALENDAR_NAME or 'zapsáno' }}{{ ' · zkušební režim' if task.gcal_event_id.startswith('mock-') }}</span>
+      <button class="btn btn-soft-danger btn-sm">Odebrat z kalendáře</button>
+    </form>
+  </div>
+  {% endif %}
   {% if task.outlook_event_id_deputy or task.outlook_event_id_assistant %}
   <div class="cal-sync">
     <span class="small fw-semibold text-body-secondary">📆 Outlook:</span>

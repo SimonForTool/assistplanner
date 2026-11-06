@@ -167,6 +167,13 @@
           <span class="d-block small text-body-secondary" data-show-private {{ 'hidden' if not private }}>{{ recipient(UserRole.DEPUTY, 'email') }}</span></label>
       </div>
     </div>
+    <div class="col-sm-6" data-show-work {{ 'hidden' if private }}>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="sync_gcal" name="sync_gcal" {{ 'checked' if v.get('sync_gcal', true) }}>
+        <label class="form-check-label" for="sync_gcal">📅 Zapsat do Google kalendáře
+          <span class="d-block small text-body-secondary">{{ settings.GCAL_CALENDAR_NAME or 'Google kalendář' }}{{ '' if settings.gcal_enabled() else ' · nepřipojen' }} · jen úkoly s termínem</span></label>
+      </div>
+    </div>
     {% if settings.sms_enabled() %}
     <div class="col-sm-6">
       <div class="form-check form-switch">

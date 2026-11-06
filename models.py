@@ -65,6 +65,9 @@ class Task(db.Model):
     sync_assistant_cal = db.Column(db.Boolean, default=False, nullable=False)
     outlook_event_id_deputy = db.Column(db.String(255), nullable=True)
     outlook_event_id_assistant = db.Column(db.String(255), nullable=True)
+    # Google kalendář (přes Apps Script) – jen pracovní úkoly s termínem
+    sync_gcal = db.Column(db.Boolean, default=True, nullable=False)
+    gcal_event_id = db.Column(db.String(255), nullable=True)
 
     # Upozornění asistentce (e-mail / SMS) při zadání a změnách od náměstka
     notify_email = db.Column(db.Boolean, default=True, nullable=False)

@@ -66,6 +66,14 @@ nikde (přehled, kalendář, závazky, historie, export, briefing, přímý odka
 náměstkovi. Kontakty pro upozornění si každý profil nastaví v aplikaci (menu → Moje kontakty);
 výchozí hodnoty `DEPUTY_EMAIL` / `DEPUTY_PHONE` a `ASSISTANT_EMAIL` / `ASSISTANT_PHONE` v `.env`.
 
+## Google kalendář
+
+Pracovní úkoly s termínem se zapisují do Google kalendáře přes skript `google_apps_script/Syncho.gs`
+(postup instalace je v jeho hlavičce). Změny a zrušení úkolu se do události propíšou a pozvaní hosté
+(např. pracovní Outlook) dostanou aktualizaci. Soukromé úkoly náměstka se nezapisují.
+`.env`: `GCAL_SCRIPT_URL`, `GCAL_SECRET`, volitelně `GCAL_CALENDAR_NAME`, `GCAL_GUESTS`.
+Test a hromadný zápis: *Moje kontakty → Otestovat Google kalendář / Zapsat budoucí úkoly*, nebo `flask --app wsgi gcal-sync`.
+
 ## Upozornění pro asistentku
 
 Když úkol zadá nebo změní náměstek, asistentka dostane e-mail (s přílohou `.ics` pro přidání do kalendáře)

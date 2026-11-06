@@ -118,6 +118,14 @@ def create_app() -> Flask:
         for kind, result in notify_service.send_test(email or None, phone or None).items():
             print(f"{kind}: {result}")
 
+    @app.cli.command("gcal-sync")
+    def _gcal_sync_cmd():
+        """Otestuje Google kalendář a zapíše do něj budoucí pracovní úkoly."""
+        from services import gcal_service
+        print("Kalendář:", gcal_service.ping())
+        count, errors = task_service.sync_all_to_gcal()
+        print(f"Zapsáno: {count}", *errors, sep="\n")
+
     @app.cli.command("seed")
     def _seed_cmd():
         """Naplní prázdnou databázi ukázkovými daty."""

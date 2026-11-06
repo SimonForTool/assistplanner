@@ -95,3 +95,24 @@ def profile_test():
         flash(f"{kind[0].upper() + kind[1:]}: {result}", "success" if result == "odesláno" else
               "info" if result.startswith(("není", "na serveru")) else "danger")
     return redirect(url_for("auth.profile"))
+
+
+@bp.route("/profile/gcal", methods=["POST"])
+@login_required
+def profile_gcal():
+    """Test spojení s Google kalendářem, případně zápis všech budoucích pracovních úkolů."""
+    from services import gcal_service, task_service
+
+    try:
+        name = gcal_service.ping()
+    except gcal_service.GCalError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("auth.profile"))
+    if request.form.get("sync_all"):
+        count, errors = task_service.sync_all_to_gcal()
+        for e in errors:
+            flash(e, "danger")
+        flash(f"Do Google kalendáře „{name}“ zapsáno úkolů: {count}.", "success")
+    else:
+        flash(f"Google kalendář je připojen: „{name}“.", "success")
+    return redirect(url_for("auth.profile"))

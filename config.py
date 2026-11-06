@@ -71,6 +71,13 @@ MS_DEPUTY_MAILBOX = _env("MS_DEPUTY_MAILBOX")
 MS_ASSISTANT_MAILBOX = _env("MS_ASSISTANT_MAILBOX")
 CALENDAR_EVENT_MINUTES = int(_env("CALENDAR_EVENT_MINUTES", "60") or 60)
 
+# --- Google kalendář (Google Apps Script, viz google_apps_script/Syncho.gs) ---
+GCAL_SCRIPT_URL = _env("GCAL_SCRIPT_URL")
+GCAL_SECRET = _env("GCAL_SECRET")
+GCAL_CALENDAR_NAME = _env("GCAL_CALENDAR_NAME")  # jen pro zobrazení, např. hana.gartn@gmail.com
+# Hosté zvaní automaticky k nové události (čárkou oddělené e-maily); prázdné = zve se ručně
+GCAL_GUESTS = [g.strip() for g in _env("GCAL_GUESTS").split(",") if g.strip()]
+
 # --- SMS (Twilio) ---
 TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
@@ -109,3 +116,7 @@ def email_enabled() -> bool:
 
 def sms_enabled() -> bool:
     return all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM])
+
+
+def gcal_enabled() -> bool:
+    return bool(GCAL_SCRIPT_URL and GCAL_SECRET)

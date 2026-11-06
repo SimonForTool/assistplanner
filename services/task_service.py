@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 import config
 from models import Priority, Setting, Task, TaskHistory, TaskStatus, TaskType, UserRole, db, utcnow
-from services import notify_service
+from services import gcal_service, notify_service
 from services.outlook_service import get_outlook
 from utils.helpers import ACTIVE_STATUSES, fmt_dt, now_local
 
@@ -42,6 +42,7 @@ EDITABLE_FIELDS = {
     "due_date": "Termín",
     "sync_deputy_cal": f"Kalendář – {UserRole.DEPUTY.value}",
     "sync_assistant_cal": f"Kalendář – {UserRole.ASSISTANT.value}",
+    "sync_gcal": "Google kalendář",
     "notify_email": "Upozornění e-mailem",
     "notify_sms": "Upozornění SMS",
     "is_private": "Soukromý",
@@ -148,7 +149,47 @@ def _sync_calendar(task: Task, changed: set[str] | None = None) -> list[str]:
         except Exception as exc:
             log.warning("Synchronizace kalendáře (%s) selhala: %s", role.value, exc)
             warnings.append(f"Kalendář {role.value}: {exc}")
+    warnings += _sync_gcal(task, changed)
     return warnings
+
+
+GCAL_FIELDS = set(CALENDAR_FIELDS) | {"organization", "subcategory", "assignee_target", "delegated_to",
+                                      "priority", "status", "sync_gcal", "is_private"}
+
+
+def _sync_gcal(task: Task, changed: set[str] | None = None) -> list[str]:
+    """Google kalendář: pracovní úkol s termínem a zapnutým přepínačem = událost; jinak se zruší."""
+    wanted = (task.sync_gcal and task.due_date and task.status in ACTIVE_STATUSES
+              and not task.is_private)
+    try:
+        if wanted and (not task.gcal_event_id or changed is None or changed & GCAL_FIELDS):
+            task.gcal_event_id = gcal_service.upsert_event(task)
+        elif not wanted and task.gcal_event_id:
+            gcal_service.delete_event(task.gcal_event_id)
+            task.gcal_event_id = None
+    except Exception as exc:
+        log.warning("Google kalendář selhal: %s", exc)
+        return [str(exc)]
+    return []
+
+
+def sync_all_to_gcal() -> tuple[int, list[str]]:
+    """Zapíše do Google kalendáře všechny budoucí pracovní úkoly, které tam ještě nejsou."""
+    count, errors = 0, []
+    with get_session() as s:
+        tasks = s.scalars(select(Task).where(
+            Task.status.in_(ACTIVE_STATUSES), Task.due_date >= now_local(),
+            Task.is_private.is_(False), Task.sync_gcal.is_(True),
+            (Task.gcal_event_id.is_(None)) | (Task.gcal_event_id.like(f"{gcal_service.MOCK_PREFIX}%")),
+        )).all()
+        for t in tasks:
+            t.gcal_event_id = None if (t.gcal_event_id or "").startswith(gcal_service.MOCK_PREFIX) else t.gcal_event_id
+            problems = _sync_gcal(t)
+            if problems:
+                errors += problems
+                break  # stejná chyba by se opakovala u každého úkolu
+            count += 1
+    return count, errors
 
 
 # --- Notifikace ---
@@ -162,7 +203,8 @@ def _notify_urgent(task: Task) -> None:
 
 
 # Změny, o kterých upozorňujeme (ne přepnutí samotných upozornění)
-_NOTIFY_FIELDS = set(EDITABLE_FIELDS) - {"notify_email", "notify_sms", "sync_deputy_cal", "sync_assistant_cal"}
+_NOTIFY_FIELDS = set(EDITABLE_FIELDS) - {"notify_email", "notify_sms", "sync_deputy_cal", "sync_assistant_cal",
+                                          "sync_gcal"}
 
 
 def notification_recipient(task_or_private) -> UserRole:
@@ -254,6 +296,8 @@ _NEW_COLUMNS = {
     "notify_email": "BOOLEAN NOT NULL DEFAULT 1",
     "notify_sms": "BOOLEAN NOT NULL DEFAULT 1",
     "is_private": "BOOLEAN NOT NULL DEFAULT 0",
+    "sync_gcal": "BOOLEAN NOT NULL DEFAULT 1",
+    "gcal_event_id": "VARCHAR(255)",
 }
 _NEW_HISTORY_COLUMNS = {"is_private": "BOOLEAN NOT NULL DEFAULT 0"}
 
@@ -357,7 +401,7 @@ def delete_task(task_id: int, user: UserRole) -> list[str]:
         task = s.get(Task, task_id)
         if task is None or (task.is_private and user != UserRole.DEPUTY):
             return ["Úkol neexistuje."]
-        task.sync_deputy_cal = task.sync_assistant_cal = False
+        task.sync_deputy_cal = task.sync_assistant_cal = task.sync_gcal = False
         warnings = _sync_calendar(task)
         _log(s, task, user, "Smazáno", f"Smazán úkol „{task.title}“ ({task.task_type.value})")
         s.flush()

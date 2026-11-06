@@ -39,6 +39,7 @@ def form_to_data(form, with_status: bool = False) -> dict:
         "organization": form.get("organization") if form.get("organization") in config.ORGANIZATIONS else None,
         "notify_email": form.get("notify_email") == "on",
         "notify_sms": form.get("notify_sms") == "on",
+        "sync_gcal": form.get("sync_gcal") == "on",
         "is_private": form.get("is_private") == "1",  # uplatní se jen u náměstka (task_service)
         "location": form.get("location", "").strip() or None,
         "due_date": parse_dt(form.get("due_date")),
@@ -195,14 +196,18 @@ def set_status(task_id: int):
 def remove_from_calendar(task_id: int):
     """Smaže událost z Outlook kalendáře vybrané role (úkol zůstává)."""
     task = _get_or_404(task_id)
-    role = enum_by_name(UserRole, request.form.get("role"))
-    if role is None:
-        abort(400)
-    field = "sync_deputy_cal" if role == UserRole.DEPUTY else "sync_assistant_cal"
+    if request.form.get("role") == "GCAL":
+        field, label = "sync_gcal", "Google kalendář"
+    else:
+        role = enum_by_name(UserRole, request.form.get("role"))
+        if role is None:
+            abort(400)
+        field = "sync_deputy_cal" if role == UserRole.DEPUTY else "sync_assistant_cal"
+        label = role.value
     _, warnings = task_service.update_task(task.id, {field: False}, current_role())
     _flash_warnings(warnings)
     if not warnings:
-        flash(f"Termín byl odebrán z kalendáře ({role.value}).", "success")
+        flash(f"Termín byl odebrán z kalendáře ({label}).", "success")
     return redirect(url_for("tasks.detail", task_id=task.id))
 
 

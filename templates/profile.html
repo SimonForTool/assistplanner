@@ -28,9 +28,16 @@
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <button class="btn btn-soft w-100">📨 Odeslat zkušební {{ 'e-mail a SMS' if settings.sms_enabled() else 'e-mail' }}</button>
   </form>
+  <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="mt-2 d-grid gap-2" style="grid-template-columns: 1fr 1fr">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="btn btn-soft">📅 Otestovat Google kalendář</button>
+    <button class="btn btn-soft" name="sync_all" value="1"
+            onclick="return confirm('Zapsat do Google kalendáře všechny budoucí pracovní úkoly s termínem?');">⤴️ Zapsat budoucí úkoly</button>
+  </form>
   <div class="card mt-3"><div class="card-body small">
     <div class="fw-semibold mb-1">Stav odesílání na serveru</div>
     <div>✉️ E-mail: {% if settings.email_enabled() %}<span class="text-success fw-semibold">nastaven</span> ({{ settings.SMTP_HOST }}:{{ settings.SMTP_PORT }}){% else %}<span class="text-body-secondary">nenastaven – zprávy se jen zaznamenají</span>{% endif %}</div>
+    <div>📅 Google kalendář: {% if settings.gcal_enabled() %}<span class="text-success fw-semibold">nastaven</span>{{ ' (' ~ settings.GCAL_CALENDAR_NAME ~ ')' if settings.GCAL_CALENDAR_NAME }}{% else %}<span class="text-body-secondary">nenastaven – události se jen zaznamenají</span>{% endif %}</div>
     <div>📱 SMS: {% if settings.sms_enabled() %}<span class="text-success fw-semibold">nastaveny</span> (Twilio){% else %}<span class="text-body-secondary">nenastaveny – zprávy se jen zaznamenají</span>{% endif %}</div>
   </div></div>
 </div></div>
