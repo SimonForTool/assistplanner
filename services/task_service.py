@@ -111,6 +111,18 @@ def get_contact(role: UserRole, kind: str) -> str:
     return _CONTACT_DEFAULTS[(role, kind)]() or ""
 
 
+def get_setting(key: str) -> str:
+    row = db.session.get(Setting, key)
+    return (row.value or "") if row else ""
+
+
+def set_setting(key: str, value: str | None) -> None:
+    with get_session() as s:
+        row = s.get(Setting, key) or Setting(key=key)
+        row.value = value
+        s.add(row)
+
+
 def set_contacts(role: UserRole, email: str, phone: str) -> None:
     with get_session() as s:
         for kind, value in (("email", email), ("phone", phone)):

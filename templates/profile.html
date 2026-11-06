@@ -28,16 +28,56 @@
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <button class="btn btn-soft w-100">📨 Odeslat zkušební {{ 'e-mail a SMS' if settings.sms_enabled() else 'e-mail' }}</button>
   </form>
-  <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="mt-2 d-grid gap-2" style="grid-template-columns: 1fr 1fr">
-    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <button class="btn btn-soft">📅 Otestovat Google kalendář</button>
-    <button class="btn btn-soft" name="sync_all" value="1"
-            onclick="return confirm('Zapsat do Google kalendáře všechny budoucí pracovní úkoly s termínem?');">⤴️ Zapsat budoucí úkoly</button>
-  </form>
+
+  <div class="card mt-3" id="gcal">
+    <div class="card-body">
+      <div class="fw-bold mb-2">📅 Google kalendář – propojení</div>
+      <ol class="small ps-3 mb-3">
+        <li class="mb-2">V Google skriptu (script.google.com) nahraďte <strong>celý řádek 13</strong> tímto řádkem:
+          <div class="input-group mt-1">
+            <input class="form-control font-monospace" style="font-size:.8rem" id="gcal-secret-line" readonly
+                   value="const SECRET = '{{ gcal_secret }}';" onclick="this.select()">
+            <button class="btn btn-sky" type="button" onclick="copyLine(this)">Kopírovat</button>
+          </div>
+        </li>
+        <li class="mb-2">Uložte (Ctrl+S) a nasaďte: <em>Implementovat → Nová implementace → Webová aplikace</em>
+          (Spustit jako: Já · Kdo má přístup: Kdokoli).</li>
+        <li>Zkopírujte <strong>Adresu URL</strong> webové aplikace (končí <code>/exec</code>) a vložte ji sem:</li>
+      </ol>
+      <form method="post" action="{{ url_for('auth.profile_gcal') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <input class="form-control mb-2" type="url" name="url" value="{{ gcal_url }}"
+               placeholder="https://script.google.com/macros/s/…/exec" required>
+        <button class="btn btn-primary w-100" name="action" value="save_url">Uložit a otestovat</button>
+      </form>
+      {% if gcal_url %}
+      <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="mt-2 d-grid gap-2" style="grid-template-columns: 1fr 1fr">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn btn-soft" name="action" value="test">📅 Otestovat</button>
+        <button class="btn btn-soft" name="action" value="sync_all"
+                onclick="return confirm('Zapsat do Google kalendáře všechny budoucí pracovní úkoly s termínem?');">⤴️ Zapsat budoucí úkoly</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="mt-2 text-end">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn btn-link btn-sm p-0" name="action" value="new_secret"
+                onclick="return confirm('Vytvořit nový klíč? Starý přestane platit a skript bude potřeba upravit.');">Vytvořit nový klíč</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    function copyLine(btn) {
+      const el = document.getElementById('gcal-secret-line');
+      el.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(el.value) : Promise.reject())
+        .catch(() => document.execCommand('copy'))
+        .finally(() => { btn.textContent = 'Zkopírováno ✓'; setTimeout(() => btn.textContent = 'Kopírovat', 2000); });
+    }
+  </script>
   <div class="card mt-3"><div class="card-body small">
     <div class="fw-semibold mb-1">Stav odesílání na serveru</div>
     <div>✉️ E-mail: {% if settings.email_enabled() %}<span class="text-success fw-semibold">nastaven</span> ({{ settings.email_via() }}){% else %}<span class="text-body-secondary">nenastaven – zprávy se jen zaznamenají</span>{% endif %}</div>
-    <div>📅 Google kalendář: {% if settings.gcal_enabled() %}<span class="text-success fw-semibold">nastaven</span>{{ ' (' ~ settings.GCAL_CALENDAR_NAME ~ ')' if settings.GCAL_CALENDAR_NAME }}{% else %}<span class="text-body-secondary">nenastaven – události se jen zaznamenají</span>{% endif %}</div>
+    <div>📅 Google kalendář: {% if settings.gcal_enabled() %}<span class="text-success fw-semibold">nastaven</span>{{ ' (' ~ gcal_name() ~ ')' if gcal_name() }}{% else %}<span class="text-body-secondary">nenastaven – události se jen zaznamenají</span>{% endif %}</div>
     <div>📱 SMS: {% if settings.sms_enabled() %}<span class="text-success fw-semibold">nastaveny</span> (Twilio){% else %}<span class="text-body-secondary">nenastaveny – zprávy se jen zaznamenají</span>{% endif %}</div>
   </div></div>
 </div></div>

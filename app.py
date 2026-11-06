@@ -84,6 +84,10 @@ def create_app() -> Flask:
             except Exception as exc:
                 log.warning("Kontrola termínů selhala: %s", exc)
 
+    def _gcal_name():
+        from services import gcal_service
+        return gcal_service.calendar_name()
+
     @app.context_processor
     def _template_globals():
         return {
@@ -98,6 +102,7 @@ def create_app() -> Flask:
             "is_overdue": task_service.is_overdue,
             "known_delegates": task_service.known_delegates,
             "contact": task_service.get_contact,
+            "gcal_name": _gcal_name,
             "settings": config,
         }
 

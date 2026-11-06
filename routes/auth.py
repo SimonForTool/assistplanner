@@ -77,9 +77,13 @@ def profile():
             task_service.set_contacts(role, email, phone)
             flash("Kontakty byly uloženy.", "success")
             return redirect(url_for("auth.profile"))
+    from services import gcal_service
+
     return render_template("profile.html",
                            email=task_service.get_contact(role, "email"),
-                           phone=task_service.get_contact(role, "phone"))
+                           phone=task_service.get_contact(role, "phone"),
+                           gcal_secret=gcal_service.ensure_secret(),
+                           gcal_url=gcal_service.script_url())
 
 
 @bp.route("/profile/test", methods=["POST"])
@@ -100,14 +104,29 @@ def profile_test():
 @bp.route("/profile/gcal", methods=["POST"])
 @login_required
 def profile_gcal():
-    """Test spojení s Google kalendářem, případně zápis všech budoucích pracovních úkolů."""
+    """Propojení s Google kalendářem: uložení adresy skriptu, nový klíč, test, hromadný zápis."""
     from services import gcal_service, task_service
 
+    action = request.form.get("action", "test")
     try:
+        if action == "new_secret":
+            gcal_service.ensure_secret(regenerate=True)
+            flash("Vytvořen nový tajný klíč – vložte nový řádek const SECRET do skriptu a nasaďte novou verzi.",
+                  "warning")
+            return redirect(url_for("auth.profile") + "#gcal")
+        if action == "save_url":
+            gcal_service.save_url(request.form.get("url", ""))
         name = gcal_service.ping()
+        if action == "sync_all":
+            count, errors = task_service.sync_all_to_gcal()
+            for e in errors:
+                flash(e, "danger")
+            flash(f"Do Google kalendáře zapsáno úkolů: {count}.", "success")
+        else:
+            flash(f"✅ Google kalendář je propojen: {name}.", "success")
     except gcal_service.GCalError as exc:
         flash(str(exc), "danger")
-        return redirect(url_for("auth.profile"))
+    return redirect(url_for("auth.profile") + "#gcal")
     if request.form.get("sync_all"):
         count, errors = task_service.sync_all_to_gcal()
         for e in errors:

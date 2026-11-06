@@ -35,7 +35,7 @@
     <form method="post" action="{{ url_for('tasks.remove_from_calendar', task_id=task.id) }}" class="d-flex align-items-center gap-2"
           onsubmit="return confirm('Odebrat termín z Google kalendáře? Pozvaní hosté dostanou zrušení.');">
       {{ csrf() }}<input type="hidden" name="role" value="GCAL">
-      <span class="tag tone-sky">{{ settings.GCAL_CALENDAR_NAME or 'zapsáno' }}{{ ' · zkušební režim' if task.gcal_event_id.startswith('mock-') }}</span>
+      <span class="tag tone-sky">{{ gcal_name() or 'zapsáno' }}{{ ' · zkušební režim' if task.gcal_event_id.startswith('mock-') }}</span>
       <button class="btn btn-soft-danger btn-sm">Odebrat z kalendáře</button>
     </form>
   </div>

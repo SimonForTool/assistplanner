@@ -3,9 +3,12 @@
 Skript běží v Google účtu, do jehož kalendáře se zapisuje (např. soukromý Gmail asistentky).
 Aplikace mu posílá JSON s tajným klíčem; skript událost vytvoří, upraví nebo zruší přes
 Google Calendar API, takže změny a zrušení dostanou i pozvaní hosté (např. v Outlooku).
-Bez GCAL_SCRIPT_URL běží zkušební režim: nic se neodesílá a události dostanou ID „mock-…“.
+Adresa skriptu a tajný klíč se nastavují v aplikaci (Moje kontakty → Google kalendář), uloží se
+do databáze a mají přednost před GCAL_SCRIPT_URL / GCAL_SECRET v .env.
+Bez adresy běží zkušební režim: nic se neodesílá a události dostanou ID „mock-…“.
 """
 import logging
+import secrets
 import uuid
 from datetime import timedelta
 
@@ -21,11 +24,56 @@ class GCalError(RuntimeError):
     """Chyba zápisu do Google kalendáře; zpráva je určená uživateli."""
 
 
+# --- Nastavení (databáze > .env) ---
+
+def _setting(key: str) -> str:
+    try:
+        from services.task_service import get_setting
+        return get_setting(key)
+    except RuntimeError:  # mimo kontext aplikace (bez databáze)
+        return ""
+
+
+def script_url() -> str:
+    return _setting("gcal_url") or config.GCAL_SCRIPT_URL
+
+
+def secret() -> str:
+    return _setting("gcal_secret") or config.GCAL_SECRET
+
+
+def calendar_name() -> str:
+    return _setting("gcal_calendar") or config.GCAL_CALENDAR_NAME
+
+
+def is_configured() -> bool:
+    return bool(script_url() and secret())
+
+
+def ensure_secret(regenerate: bool = False) -> str:
+    """Tajný klíč pro skript; při prvním použití ho vytvoří a uloží do databáze."""
+    from services.task_service import get_setting, set_setting
+    current = get_setting("gcal_secret")
+    if regenerate or not current:
+        current = secrets.token_urlsafe(24)
+        set_setting("gcal_secret", current)
+    return current
+
+
+def save_url(url: str) -> str:
+    from services.task_service import set_setting
+    url = url.strip()
+    if not (url.startswith("https://script.google.com/") and url.rstrip("/").endswith("/exec")):
+        raise GCalError("Adresa musí začínat https://script.google.com/ a končit /exec – zkopírujte "
+                        "„Adresu URL“ webové aplikace z okna Spravovat implementace.")
+    set_setting("gcal_url", url.rstrip("/"))
+    return url
+
+
 def _call(payload: dict) -> dict:
     try:
         # Apps Script odpovídá přesměrováním na script.googleusercontent.com – requests ho následuje
-        resp = requests.post(config.GCAL_SCRIPT_URL, json={"secret": config.GCAL_SECRET, **payload},
-                             timeout=30)
+        resp = requests.post(script_url(), json={"secret": secret(), **payload}, timeout=30)
     except requests.RequestException as exc:
         raise GCalError(
             f"Nelze se spojit s Google Apps Script ({exc.__class__.__name__}). Na bezplatném "
@@ -34,7 +82,7 @@ def _call(payload: dict) -> dict:
     try:
         data = resp.json()
     except ValueError as exc:
-        hint = ("Skript není nasazený pro přístup „Kdokoli“ (Anyone), nebo je GCAL_SCRIPT_URL špatně."
+        hint = ("Skript není nasazený pro přístup „Kdokoli“, nebo je adresa skriptu špatně."
                 if "accounts.google.com" in resp.url or resp.status_code in (401, 403, 404)
                 else f"Odpověď {resp.status_code} není JSON.")
         raise GCalError(f"Google Apps Script neodpověděl správně – {hint}") from exc
@@ -44,7 +92,8 @@ def _call(payload: dict) -> dict:
             error = ("skript v Google účtu je starší verze – vložte aktuální google_apps_script/Syncho.gs "
                      "a nasaďte novou verzi (Implementovat → Spravovat implementace → upravit → Nová verze)")
         elif error == "unauthorized":
-            error = "nesouhlasí tajný klíč – GCAL_SECRET v .env musí být stejný jako SECRET ve skriptu"
+            error = ("nesouhlasí tajný klíč – řádek const SECRET ve skriptu musí být přesně ten, který "
+                     "ukazuje aplikace v Moje kontakty, a skript je potřeba nasadit v nové verzi")
         raise GCalError(f"Google kalendář: {error}")
     return data
 
@@ -71,7 +120,7 @@ def _event_payload(task) -> dict:
 def upsert_event(task) -> str:
     """Vytvoří nebo aktualizuje událost úkolu, vrátí její ID."""
     event_id = task.gcal_event_id
-    if not config.gcal_enabled():
+    if not is_configured():
         if event_id:
             log.info("[MOCK Google kalendář] Aktualizována událost %s", event_id)
             return event_id
@@ -85,7 +134,7 @@ def upsert_event(task) -> str:
 
 
 def delete_event(event_id: str) -> None:
-    if not config.gcal_enabled() or event_id.startswith(MOCK_PREFIX):
+    if not is_configured() or event_id.startswith(MOCK_PREFIX):
         log.info("[MOCK Google kalendář] Smazána událost %s", event_id)
         return
     _call({"action": "delete", "eventId": event_id})
@@ -96,16 +145,18 @@ SCRIPT_VERSION = 2  # verze google_apps_script/Syncho.gs, kterou aplikace potře
 
 def ping() -> str:
     """Ověří spojení se skriptem; vrátí název kalendáře (a upozorní na starou verzi skriptu)."""
-    if not config.gcal_enabled():
-        raise GCalError("Google kalendář není nastaven (GCAL_SCRIPT_URL a GCAL_SECRET v .env).")
+    if not is_configured():
+        raise GCalError("Google kalendář není propojen – vložte adresu skriptu v Moje kontakty.")
     data = _call({"action": "ping"})
     name = data.get("calendar", "?")
+    from services.task_service import set_setting
+    set_setting("gcal_calendar", name)
     version = data.get("version") or 1
     if version < SCRIPT_VERSION:
         raise GCalError(
-            f"Kalendář „{name}“ je připojen, ale adresa v GCAL_SCRIPT_URL vede na starou verzi skriptu "
-            f"(verze {version}, potřeba {SCRIPT_VERSION}). Buď v Google vydejte novou verzi té implementace, "
-            "nebo do .env zkopírujte adresu implementace, kterou jste aktualizoval(a)."
+            f"Kalendář „{name}“ je připojen, ale adresa vede na starou verzi skriptu (verze {version}, "
+            f"potřeba {SCRIPT_VERSION}). V Google vydejte novou verzi té implementace, nebo vložte "
+            "adresu implementace, kterou jste aktualizoval(a)."
         )
     return f"{name} · skript verze {version}"
 

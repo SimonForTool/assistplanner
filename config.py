@@ -125,7 +125,8 @@ def email_via() -> str:
     if smtp_enabled():
         return f"{SMTP_HOST}:{SMTP_PORT}"
     if gcal_enabled():
-        return f"Google účet {GCAL_CALENDAR_NAME or '(Apps Script)'}"
+        from services import gcal_service
+        return f"Google účet {gcal_service.calendar_name() or '(Apps Script)'}"
     return ""
 
 
@@ -134,4 +135,6 @@ def sms_enabled() -> bool:
 
 
 def gcal_enabled() -> bool:
-    return bool(GCAL_SCRIPT_URL and GCAL_SECRET)
+    """Google kalendář propojen (adresa skriptu + klíč z aplikace nebo z .env)."""
+    from services import gcal_service
+    return gcal_service.is_configured()

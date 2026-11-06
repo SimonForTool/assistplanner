@@ -171,7 +171,7 @@
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_gcal" name="sync_gcal" {{ 'checked' if v.get('sync_gcal', true) }}>
         <label class="form-check-label" for="sync_gcal">📅 Zapsat do Google kalendáře
-          <span class="d-block small text-body-secondary">{{ settings.GCAL_CALENDAR_NAME or 'Google kalendář' }}{{ '' if settings.gcal_enabled() else ' · nepřipojen' }} · jen úkoly s termínem</span></label>
+          <span class="d-block small text-body-secondary">{{ gcal_name() or 'Google kalendář' }}{{ '' if settings.gcal_enabled() else ' · nepřipojen' }} · jen úkoly s termínem</span></label>
       </div>
     </div>
     {% if settings.sms_enabled() %}
