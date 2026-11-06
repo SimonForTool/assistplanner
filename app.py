@@ -102,6 +102,7 @@ def create_app() -> Flask:
             "is_overdue": task_service.is_overdue,
             "known_delegates": task_service.known_delegates,
             "contact": task_service.get_contact,
+            "email_recipients": task_service.email_recipients,
             "gcal_name": _gcal_name,
             "settings": config,
         }

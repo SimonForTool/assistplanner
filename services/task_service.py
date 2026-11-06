@@ -225,16 +225,25 @@ def notification_recipient(task_or_private) -> UserRole:
     return UserRole.DEPUTY if private else UserRole.ASSISTANT
 
 
-def email_recipients(private: bool) -> list[str]:
-    """Pracovní úkol → asistentka + kopie (TASK_EMAIL_COPY); soukromý → jen náměstek."""
-    who = notification_recipient(private)
-    addresses = [get_contact(who, "email")] + ([] if private else config.TASK_EMAIL_COPY)
-    seen, result = set(), []
+def email_recipients(private: bool) -> tuple[str, list[str]]:
+    """Komu jde e-mail o úkolu: (adresát, kopie).
+
+    Soukromý úkol → jen e-mail náměstka z Moje kontakty.
+    Pracovní úkol → adresát = první adresa z TASK_EMAIL_COPY (např. sdílený Gmail asistentky),
+    v kopii e-mail asistentky z Moje kontakty (např. pracovní – kvůli notifikaci v telefonu)
+    a případné další adresy z TASK_EMAIL_COPY.
+    """
+    if private:
+        return get_contact(UserRole.DEPUTY, "email"), []
+    addresses = list(config.TASK_EMAIL_COPY) + [get_contact(UserRole.ASSISTANT, "email")]
+    seen, unique = set(), []
     for a in addresses:
         if a and a.lower() not in seen:
             seen.add(a.lower())
-            result.append(a)
-    return result
+            unique.append(a)
+    if not unique:
+        return "", []
+    return unique[0], unique[1:]
 
 
 def _notify_recipient(task: Task, user: UserRole, event: str, changes: str | None = None) -> list[str]:
@@ -246,12 +255,13 @@ def _notify_recipient(task: Task, user: UserRole, event: str, changes: str | Non
     phone = get_contact(who, "phone")
     warnings = []
     if task.notify_email:
-        for address in email_recipients(bool(task.is_private)):
+        to, cc = email_recipients(bool(task.is_private))
+        if to:
             try:
-                notify_service.send_task_email(address, task, event, changes, user)
+                notify_service.send_task_email(to, task, event, changes, user, cc=cc)
             except Exception as exc:
-                log.warning("E-mail (%s) se nepodařilo odeslat: %s", address, exc)
-                warnings.append(f"E-mail na {address} se nepodařilo odeslat: {exc}")
+                log.warning("E-mail (%s) se nepodařilo odeslat: %s", to, exc)
+                warnings.append(f"E-mail na {', '.join([to] + cc)} se nepodařilo odeslat: {exc}")
     if task.notify_sms and phone:
         try:
             notify_service.send_task_sms(phone, task, event)

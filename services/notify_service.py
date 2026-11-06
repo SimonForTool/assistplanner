@@ -38,22 +38,30 @@ def _sender() -> str:
 
 
 def deliver_email(to: str, subject: str, text: str,
-                  attachments: list[tuple[bytes, str, str, str]] | None = None) -> None:
-    """Odešle e-mail. attachments: (data, maintype, subtype, filename). Bez SMTP jen zaloguje."""
+                  attachments: list[tuple[bytes, str, str, str]] | None = None,
+                  cc: list[str] | None = None) -> None:
+    """Odešle e-mail (cc = kopie). attachments: (data, maintype, subtype, filename).
+
+    Bez SMTP přes Google účet skriptu Apps Script, bez obojího jen zaloguje.
+    """
+    cc = [a for a in (cc or []) if a and a.lower() != to.lower()]
     if not config.smtp_enabled():
         if config.gcal_enabled():
             from services import gcal_service
             try:
-                gcal_service.send_mail(to, subject, text)
+                # MailApp: více adresátů oddělených čárkou = jeden společný e-mail
+                gcal_service.send_mail(", ".join([to] + cc), subject, text)
             except gcal_service.GCalError as exc:
                 raise DeliveryError(str(exc)) from exc
             return
-        log.info("[MOCK e-mail → %s] %s\n%s", to, subject, text)
+        log.info("[MOCK e-mail → %s%s] %s\n%s", to, f" (kopie {', '.join(cc)})" if cc else "", subject, text)
         return
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = _sender()
     msg["To"] = to
+    if cc:
+        msg["Cc"] = ", ".join(cc)
     msg["Message-ID"] = make_msgid(domain=(config.SMTP_FROM or config.SMTP_USER or "syncho").split("@")[-1])
     msg.set_content(text)
     for data, maintype, subtype, filename in attachments or []:
@@ -290,12 +298,13 @@ def _outlook_email(task, event: str, changes: str | None, user=None) -> tuple[st
     return subject, "\n".join(lines)
 
 
-def send_task_email(to: str, task, event: str, changes: str | None = None, user=None) -> None:
+def send_task_email(to: str, task, event: str, changes: str | None = None, user=None,
+                    cc: list[str] | None = None) -> None:
     subject, text = _outlook_email(task, event, changes, user)
     attachments = []
     if config.EMAIL_ATTACH_ICS and task.due_date and event != "Úkol smazán":
         attachments.append((_ics(task), "text", "calendar", f"{task.code}.ics"))
-    deliver_email(to, subject, text, attachments)
+    deliver_email(to, subject, text, attachments, cc=cc)
 
 
 def send_task_sms(phone: str, task, event: str) -> None:

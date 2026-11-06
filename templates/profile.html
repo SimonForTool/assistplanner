@@ -8,9 +8,12 @@
       <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <p class="text-body-secondary small">
         {% if current_role == UserRole.DEPUTY %}
-          Sem se posílají upozornění na vaše <strong>soukromé úkoly</strong>. Pracovní úkoly chodí {{ UserRole.ASSISTANT.value }}.
+          Sem chodí <strong>jen vaše soukromé úkoly</strong>. Pracovní úkoly se zapisují do Google kalendáře
+          a e-mailem chodí {{ UserRole.ASSISTANT.value }}.
         {% else %}
-          Sem se posílají upozornění při každém zadání, změně a smazání pracovního úkolu.
+          {% set work_to, work_cc = email_recipients(false) %}
+          Na tento e-mail chodí <strong>kopie</strong> e-mailu o každém zadání, změně a smazání pracovního úkolu
+          {%- if work_to and work_to != email %} (hlavní adresát: {{ work_to }}){% endif %}.
         {% endif %}
       </p>
       <label class="form-label" for="email">✉️ E-mail</label>
