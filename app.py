@@ -95,6 +95,7 @@ def create_app() -> Flask:
             "STATUS_BADGES": helpers.STATUS_BADGES,
             "is_overdue": task_service.is_overdue,
             "known_delegates": task_service.known_delegates,
+            "contact": task_service.get_contact,
             "settings": config,
         }
 

@@ -64,6 +64,12 @@
   function setField(name, value) {
     const el = form.elements[name];
     if (!el || value === null || value === undefined || value === '') return false;
+    if (typeof RadioNodeList !== 'undefined' && el instanceof RadioNodeList) {
+      el.value = value;  // přepínač Pracovní / Soukromý
+      const checked = Array.from(el).find(r => r.checked);
+      if (checked) checked.dispatchEvent(new Event('change'));
+      return true;
+    }
     el.value = value;
     if (el.tagName === 'SELECT') el.dispatchEvent(new Event('change'));
     highlight(el);

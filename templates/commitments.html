@@ -35,7 +35,7 @@
   {% set late = is_overdue(t) %}
   <article class="task-card {{ 'prio-red' if late else 'prio-sky' }} {{ 'is-done' if t.status in [TaskStatus.CLOSED, TaskStatus.CANCELLED] }}">
     <div class="body">
-      <div class="code">KOMU</div>
+      <div class="code">KOMU{% if t.is_private %} · 🔒 SOUKROMÉ{% endif %}</div>
       <div class="fw-bold fs-5 lh-sm" style="color: var(--sy-navy-900)">{{ t.assignee_target or '—' }}</div>
       <a class="title fw-semibold mt-1" style="font-weight:600" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a>
       <div class="meta">

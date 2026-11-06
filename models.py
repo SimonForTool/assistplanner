@@ -52,6 +52,8 @@ class Task(db.Model):
     delegated_to = db.Column(db.String(255), nullable=True)  # Komu byl úkol zadán k vyřízení
     organization = db.Column(db.String(32), nullable=True)  # VFN, ONMB, MZČR, FNKV (config.ORGANIZATIONS)
     subcategory = db.Column(db.String(64), nullable=True)  # jen u organizací s podkategoriemi (VFN)
+    # Soukromý úkol náměstka – asistentka ho nevidí; upozornění jdou jen náměstkovi
+    is_private = db.Column(db.Boolean, default=False, nullable=False)
     creator = db.Column(db.Enum(UserRole), nullable=False)
     location = db.Column(db.String(255), nullable=True)
     priority = db.Column(db.Enum(Priority), default=Priority.MEDIUM, nullable=False)
@@ -98,3 +100,12 @@ class TaskHistory(db.Model):
     action = db.Column(db.String(50), nullable=False)  # "Vytvořeno", "Změna stavu", "Smazáno", ...
     changes_summary = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.DateTime, default=utcnow, nullable=False)
+    is_private = db.Column(db.Boolean, default=False, nullable=False)  # záznam soukromého úkolu
+
+
+class Setting(db.Model):
+    """Nastavení upravitelná v aplikaci (např. kontakty pro upozornění), klíč → hodnota."""
+    __tablename__ = "settings"
+
+    key = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.Text, nullable=True)

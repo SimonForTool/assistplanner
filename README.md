@@ -59,6 +59,13 @@ python app.py               # http://localhost:5000
 Zobrazovaná jména profilů se nastavují v `.env` (`DEPUTY_NAME`, výchozí *Michal*; `ASSISTANT_NAME`, výchozí *Hanka*).
 V databázi se ukládá jen role, takže přejmenování nemění data.
 
+## Soukromé úkoly náměstka
+
+Náměstek přepne u úkolu **Pracovní / Soukromý** (výchozí je pracovní). Soukromé úkoly asistentka nevidí
+nikde (přehled, kalendář, závazky, historie, export, briefing, přímý odkaz) a upozornění na ně jdou jen
+náměstkovi. Kontakty pro upozornění si každý profil nastaví v aplikaci (menu → Moje kontakty);
+výchozí hodnoty `DEPUTY_EMAIL` / `DEPUTY_PHONE` a `ASSISTANT_EMAIL` / `ASSISTANT_PHONE` v `.env`.
+
 ## Upozornění pro asistentku
 
 Když úkol zadá nebo změní náměstek, asistentka dostane e-mail (s přílohou `.ics` pro přidání do kalendáře)

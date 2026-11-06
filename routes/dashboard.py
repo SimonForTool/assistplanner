@@ -2,14 +2,14 @@
 import csv
 import io
 import re
-from datetime import date, timedelta
+from datetime import timedelta
 
 from flask import Blueprint, Response, jsonify, render_template, request
 from markupsafe import Markup, escape
 
 import config
 from models import Priority, Task, TaskStatus, TaskType, UserRole
-from routes.auth import login_required
+from routes.auth import current_role, login_required
 from services import ai_service, task_service
 from services.outlook_service import get_outlook
 from utils import czech_calendar as cz
@@ -18,7 +18,7 @@ from utils.helpers import ACTIVE_STATUSES, enum_by_name, fmt_dt, now_local, toda
 bp = Blueprint("dashboard", __name__)
 
 # Briefing se generuje nejvýše jednou denně na proces (lze vynutit tlačítkem)
-_briefing_cache: dict[date, tuple[str, bool]] = {}
+_briefing_cache: dict[tuple, tuple[str, bool]] = {}
 
 
 def parse_filters(args, default_active: bool = True) -> dict:
@@ -88,8 +88,9 @@ def _briefing_html(text: str) -> Markup:
 @bp.route("/api/briefing")
 @login_required
 def briefing():
-    today = now_local().date()
-    if request.args.get("refresh") or today not in _briefing_cache:
+    # Mezipaměť zvlášť pro každý profil – briefing náměstka obsahuje i jeho soukromé úkoly
+    key = (now_local().date(), current_role())
+    if request.args.get("refresh") or key not in _briefing_cache:
         active = task_service.list_tasks(include_inactive=False)
         calendar, warning = [], None
         try:
@@ -97,11 +98,12 @@ def briefing():
         except Exception as exc:
             warning = f"Kalendář nedostupný: {exc}"
         text, ai_used = ai_service.generate_morning_briefing(active, calendar)
-        _briefing_cache.clear()
-        _briefing_cache[today] = (text, ai_used)
+        for old in [k for k in _briefing_cache if k[0] != key[0]]:
+            del _briefing_cache[old]
+        _briefing_cache[key] = (text, ai_used)
         if warning:
             return jsonify(html=_briefing_html(text), ai_used=ai_used, warning=warning)
-    text, ai_used = _briefing_cache[today]
+    text, ai_used = _briefing_cache[key]
     return jsonify(html=_briefing_html(text), ai_used=ai_used)
 
 

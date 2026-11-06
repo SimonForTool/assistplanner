@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Moje kontakty · {{ settings.APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Moje kontakty</h1></div>
+<div class="row"><div class="col-lg-6">
+  <form method="post" class="card">
+    <div class="card-body">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <p class="text-body-secondary small">
+        {% if current_role == UserRole.DEPUTY %}
+          Sem se posílají upozornění na vaše <strong>soukromé úkoly</strong>. Pracovní úkoly chodí {{ UserRole.ASSISTANT.value }}.
+        {% else %}
+          Sem se posílají upozornění na úkoly, které vám zadá {{ UserRole.DEPUTY.value }}.
+        {% endif %}
+      </p>
+      <label class="form-label" for="email">✉️ E-mail</label>
+      <input class="form-control mb-3" type="email" id="email" name="email" value="{{ email }}" placeholder="jmeno@example.cz" autocomplete="email">
+      <label class="form-label" for="phone">📱 Telefon pro notifikace (SMS)</label>
+      <input class="form-control" type="tel" id="phone" name="phone" value="{{ phone }}" placeholder="+420 123 456 789" autocomplete="tel">
+      <div class="form-text small">Prázdné pole = upozornění tímto kanálem nechodí.
+        {% if not settings.email_enabled() or not settings.sms_enabled() %}<br>Odesílání
+        {{ 'e-mailů' if not settings.email_enabled() }}{{ ' a ' if not settings.email_enabled() and not settings.sms_enabled() }}{{ 'SMS' if not settings.sms_enabled() }}
+        zatím není na serveru nastaveno – zprávy se jen zaznamenají.{% endif %}</div>
+    </div>
+    <div class="card-footer"><button class="btn btn-primary btn-lg w-100">Uložit kontakty</button></div>
+  </form>
+</div></div>
+{% endblock %}

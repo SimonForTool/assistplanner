@@ -54,3 +54,26 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("auth.login"))
+
+
+@bp.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    """Moje kontakty pro upozornění (e-mail, telefon) – každý profil si je spravuje sám."""
+    from services import task_service
+
+    role = current_role()
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        phone = request.form.get("phone", "").strip()
+        if email and "@" not in email:
+            flash("Zadejte platný e-mail.", "danger")
+        elif phone and not phone.replace(" ", "").lstrip("+").isdigit():
+            flash("Telefon zadejte ve tvaru +420 123 456 789.", "danger")
+        else:
+            task_service.set_contacts(role, email, phone.replace(" ", ""))
+            flash("Kontakty byly uloženy.", "success")
+            return redirect(url_for("auth.profile"))
+    return render_template("profile.html",
+                           email=task_service.get_contact(role, "email"),
+                           phone=task_service.get_contact(role, "phone"))

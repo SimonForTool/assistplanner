@@ -390,6 +390,7 @@ def extract_task(text: str, now: datetime | None = None) -> dict:
         "due_date": due.strftime("%Y-%m-%d %H:%M") if due else None,
         "description": note,
         "delegated_to": to_nominative(parts["delegate"]) if parts.get("delegate") else None,
+        "private": bool(re.search(r"\bsoukrom\w*", text, re.I)),
         "organization": org,
         "subcategory": sub,
         # text mimo klíčová slova („místo …“, „termín …“) – pro doplnění poznámky

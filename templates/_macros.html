@@ -13,7 +13,7 @@
   {% set done = t.status in [TaskStatus.CLOSED, TaskStatus.CANCELLED] %}
   <article class="task-card prio-{{ PRIORITY_BADGES[t.priority] }} {{ 'is-done' if done }}">
     <div class="body">
-      <div class="code">{{ t.code }}{% if t.is_commitment %} · 🤝 ZÁVAZEK{% endif %}</div>
+      <div class="code">{{ t.code }}{% if t.is_private %} · 🔒 SOUKROMÉ{% endif %}{% if t.is_commitment %} · 🤝 ZÁVAZEK{% endif %}</div>
       <a class="title" href="{{ url_for('tasks.detail', task_id=t.id) }}">{{ t.title }}</a>
       <div class="meta">
         <span class="{{ 'overdue' if is_overdue(t) }}">🗓️ {{ t.due_date|dt }}{{ ' · po termínu' if is_overdue(t) }}</span>
@@ -49,7 +49,20 @@
   {% set priority = v.get('priority') or Priority.MEDIUM %}
   {% set status = v.get('status') or TaskStatus.OPEN %}
   {% set due = v.get('due_date') %}
-  <div class="row g-3">
+  {% set private = v.get('is_private') %}
+  <div class="row g-3" data-privacy-scope>
+    {% if current_role == UserRole.DEPUTY %}
+    <div class="col-12">
+      <div class="privacy-pick" role="radiogroup" aria-label="Druh úkolu">
+        <input type="radio" name="is_private" id="is_private_0" value="0" {{ 'checked' if not private }}>
+        <label for="is_private_0">💼 Pracovní</label>
+        <input type="radio" name="is_private" id="is_private_1" value="1" {{ 'checked' if private }}>
+        <label for="is_private_1">🔒 Soukromý</label>
+      </div>
+      <div class="form-text small" data-show-private {{ 'hidden' if not private }}>
+        Soukromý úkol uvidíte jen vy – {{ UserRole.ASSISTANT.value }} ho nikde neuvidí.</div>
+    </div>
+    {% endif %}
     <div class="col-12">
       <label class="form-label" for="title">Název *</label>
       <input class="form-control" id="title" name="title" required maxlength="255"
@@ -135,22 +148,47 @@
       <label class="form-label" for="description">Popis / poznámka</label>
       <textarea class="form-control" id="description" name="description" rows="3">{{ v.get('description') or '' }}</textarea>
     </div>
-    <div class="col-12"><div class="form-label mb-0">📣 Upozornění – {{ UserRole.ASSISTANT.value }}</div>
-      <div class="form-text small mt-0">Odešle se, když úkol zadá nebo změní {{ UserRole.DEPUTY.value }}.</div></div>
+    {% macro recipient(role, kind) -%}
+      {% set value = contact(role, kind) %}
+      {%- if value -%}{{ value }}{{ ' · ' ~ ('e-mail nepřipojen' if kind == 'email' else 'SMS nepřipojeny') if not (settings.email_enabled() if kind == 'email' else settings.sms_enabled()) }}
+      {%- else -%}{{ 'e-mail' if kind == 'email' else 'telefon' }} není nastaven – <a href="{{ url_for('auth.profile') }}">Moje kontakty</a>{%- endif -%}
+    {%- endmacro %}
+    <div class="col-12">
+      <div class="form-label mb-0" data-show-work {{ 'hidden' if private }}>📣 Upozornění – {{ UserRole.ASSISTANT.value }}</div>
+      <div class="form-label mb-0" data-show-private {{ 'hidden' if not private }}>📣 Upozornění – jen {{ UserRole.DEPUTY.value }}</div>
+      <div class="form-text small mt-0" data-show-work {{ 'hidden' if private }}>Odešle se, když úkol zadá nebo změní {{ UserRole.DEPUTY.value }}.</div>
+      <div class="form-text small mt-0" data-show-private {{ 'hidden' if not private }}>Soukromý úkol se při uložení pošle jen vám.</div>
+    </div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="notify_email" name="notify_email" {{ 'checked' if v.get('notify_email', true) }}>
         <label class="form-check-label" for="notify_email">✉️ Odeslat do e-mailu
-          <span class="d-block small text-body-secondary">{{ settings.ASSISTANT_EMAIL or 'e-mail není nastaven (ASSISTANT_EMAIL)' }}{{ ' · e-mail nepřipojen' if settings.ASSISTANT_EMAIL and not settings.email_enabled() }}</span></label>
+          <span class="d-block small text-body-secondary" data-show-work {{ 'hidden' if private }}>{{ recipient(UserRole.ASSISTANT, 'email') }}</span>
+          <span class="d-block small text-body-secondary" data-show-private {{ 'hidden' if not private }}>{{ recipient(UserRole.DEPUTY, 'email') }}</span></label>
       </div>
     </div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="notify_sms" name="notify_sms" {{ 'checked' if v.get('notify_sms', true) }}>
         <label class="form-check-label" for="notify_sms">📱 Notifikace do telefonu (SMS)
-          <span class="d-block small text-body-secondary">{{ settings.ASSISTANT_PHONE or 'telefon není nastaven (ASSISTANT_PHONE)' }}{{ ' · SMS nepřipojeny' if settings.ASSISTANT_PHONE and not settings.sms_enabled() }}</span></label>
+          <span class="d-block small text-body-secondary" data-show-work {{ 'hidden' if private }}>{{ recipient(UserRole.ASSISTANT, 'phone') }}</span>
+          <span class="d-block small text-body-secondary" data-show-private {{ 'hidden' if not private }}>{{ recipient(UserRole.DEPUTY, 'phone') }}</span></label>
       </div>
     </div>
+    {% if current_role == UserRole.DEPUTY %}
+    <script>
+      (function () {
+        // Přepínač Pracovní / Soukromý: ukáže správné příjemce upozornění
+        const scope = document.currentScript.closest('[data-privacy-scope]');
+        function sync() {
+          const priv = scope.querySelector('input[name=is_private]:checked').value === '1';
+          scope.querySelectorAll('[data-show-private]').forEach(el => el.hidden = !priv);
+          scope.querySelectorAll('[data-show-work]').forEach(el => el.hidden = priv);
+        }
+        scope.querySelectorAll('input[name=is_private]').forEach(r => r.addEventListener('change', sync));
+      })();
+    </script>
+    {% endif %}
     {% if settings.graph_enabled() %}
     <div class="col-12"><div class="form-label mb-0">📆 Outlook kalendář</div></div>
     <div class="col-sm-6">

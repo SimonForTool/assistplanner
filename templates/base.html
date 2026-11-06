@@ -46,6 +46,7 @@
         <div class="px-2 py-1 small text-body-secondary">
           {{ '🟢' if settings.openai_enabled() else '⚪' }} AI &nbsp; {{ '🟢' if settings.graph_enabled() else '⚪' }} Outlook
         </div>
+        <a class="dropdown-item rounded-2" href="{{ url_for('auth.profile') }}">📇 Moje kontakty</a>
         <hr class="my-2">
         <form method="post" action="{{ url_for('auth.logout') }}">
           <input type="hidden" name="_csrf" value="{{ csrf_token() }}">

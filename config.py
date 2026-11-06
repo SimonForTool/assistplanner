@@ -29,8 +29,11 @@ ORGANIZATIONS = {
 }
 
 # Upozornění asistentce na úkoly, které zadá náměstek (u úkolu lze vypnout)
+# Výchozí kontakty pro upozornění (každý je může změnit v aplikaci: Moje kontakty)
 ASSISTANT_EMAIL = _env("ASSISTANT_EMAIL")
 ASSISTANT_PHONE = _env("ASSISTANT_PHONE")
+DEPUTY_EMAIL = _env("DEPUTY_EMAIL")
+DEPUTY_PHONE = _env("DEPUTY_PHONE")
 
 
 def _secret_key() -> str:

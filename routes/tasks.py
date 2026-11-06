@@ -39,6 +39,7 @@ def form_to_data(form, with_status: bool = False) -> dict:
         "organization": form.get("organization") if form.get("organization") in config.ORGANIZATIONS else None,
         "notify_email": form.get("notify_email") == "on",
         "notify_sms": form.get("notify_sms") == "on",
+        "is_private": form.get("is_private") == "1",  # uplatní se jen u náměstka (task_service)
         "location": form.get("location", "").strip() or None,
         "due_date": parse_dt(form.get("due_date")),
         "description": form.get("description", "").strip() or None,
@@ -142,6 +143,8 @@ def ai_extract():
     if fields["assignee_target"]:
         fields["task_type"] = TaskType.COMMITMENT.name  # stejné pravidlo jako při uložení
     # Text pro „Doplnit / Nahradit poznámku“: část „do poznámky …“, jinak diktát bez místa a termínu
+    if result.get("private") and current_role() == UserRole.DEPUTY:
+        fields["is_private"] = "1"
     note = result.get("description") or result.get("remainder") or text
     fields["note"] = note[:1].upper() + note[1:]
     return jsonify(fields=fields, transcript=text, ai_used=ai_used)

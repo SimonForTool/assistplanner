@@ -10,6 +10,7 @@
   <div class="d-flex flex-wrap gap-2 align-items-center">
     <span class="code small fw-bold text-body-secondary">{{ task.code }}</span>
     {{ priority_badge(task.priority) }} {{ status_badge(task.status) }}
+    {% if task.is_private %}<span class="tag tone-amber">🔒 Soukromý</span>{% endif %}
     {% if task.is_commitment %}<span class="tag tone-sky">🤝 Závazek</span>{% endif %}
     {% if task.organization %}<span class="tag tone-navy">🏥 {{ task.organization }}{{ ' · ' ~ task.subcategory if task.subcategory }}</span>{% endif %}
   </div>

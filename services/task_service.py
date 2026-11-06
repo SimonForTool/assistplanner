@@ -4,13 +4,13 @@ UI volá výhradně tyto funkce, aby se žádná změna neobešla bez záznamu v
 """
 import logging
 from contextlib import contextmanager
-
-import config
 from datetime import datetime, timedelta
 
+from flask import has_request_context, session
 from sqlalchemy import select
 
-from models import Priority, Task, TaskHistory, TaskStatus, TaskType, UserRole, db, utcnow
+import config
+from models import Priority, Setting, Task, TaskHistory, TaskStatus, TaskType, UserRole, db, utcnow
 from services import notify_service
 from services.outlook_service import get_outlook
 from utils.helpers import ACTIVE_STATUSES, fmt_dt, now_local
@@ -42,8 +42,9 @@ EDITABLE_FIELDS = {
     "due_date": "Termín",
     "sync_deputy_cal": f"Kalendář – {UserRole.DEPUTY.value}",
     "sync_assistant_cal": f"Kalendář – {UserRole.ASSISTANT.value}",
-    "notify_email": f"E-mail – {UserRole.ASSISTANT.value}",
-    "notify_sms": f"SMS – {UserRole.ASSISTANT.value}",
+    "notify_email": "Upozornění e-mailem",
+    "notify_sms": "Upozornění SMS",
+    "is_private": "Soukromý",
 }
 CALENDAR_FIELDS = ("title", "description", "location", "due_date")
 
@@ -70,9 +71,52 @@ def _action_for(changed: set[str]) -> str:
     return "Upraveno"
 
 
-def _log(session, task: Task, user: UserRole, action: str, summary: str | None) -> None:
-    session.add(TaskHistory(task_id=task.id, task_code=task.code, task_title=task.title,
-                            user=user, action=action, changes_summary=summary))
+def _log(s, task: Task, user: UserRole, action: str, summary: str | None) -> None:
+    s.add(TaskHistory(task_id=task.id, task_code=task.code, task_title=task.title,
+                      user=user, action=action, changes_summary=summary,
+                      is_private=bool(task.is_private)))
+
+
+# --- Viditelnost: asistentka nevidí soukromé úkoly náměstka ---
+
+def _viewer(viewer: UserRole | None) -> UserRole | None:
+    """Kdo se dívá: explicitně, jinak přihlášená role z requestu (bezpečný výchozí stav)."""
+    if viewer is not None:
+        return viewer
+    if has_request_context():
+        role = session.get("role")
+        return UserRole[role] if role in UserRole.__members__ else None
+    return None  # CLI / plánované úlohy vidí vše
+
+
+def hides_private(viewer: UserRole | None = None) -> bool:
+    return _viewer(viewer) == UserRole.ASSISTANT
+
+
+# --- Kontakty pro upozornění (upravitelné v aplikaci, výchozí z .env) ---
+
+_CONTACT_DEFAULTS = {
+    (UserRole.DEPUTY, "email"): lambda: config.DEPUTY_EMAIL,
+    (UserRole.DEPUTY, "phone"): lambda: config.DEPUTY_PHONE,
+    (UserRole.ASSISTANT, "email"): lambda: config.ASSISTANT_EMAIL,
+    (UserRole.ASSISTANT, "phone"): lambda: config.ASSISTANT_PHONE,
+}
+
+
+def get_contact(role: UserRole, kind: str) -> str:
+    row = db.session.get(Setting, f"{role.name}_{kind}")
+    if row is not None:
+        return row.value or ""
+    return _CONTACT_DEFAULTS[(role, kind)]() or ""
+
+
+def set_contacts(role: UserRole, email: str, phone: str) -> None:
+    with get_session() as s:
+        for kind, value in (("email", email), ("phone", phone)):
+            key = f"{role.name}_{kind}"
+            row = s.get(Setting, key) or Setting(key=key)
+            row.value = value.strip()
+            s.add(row)
 
 
 # --- Outlook ---
@@ -117,27 +161,35 @@ def _notify_urgent(task: Task) -> None:
     )
 
 
-# Změny, o kterých asistentku informujeme (ne přepnutí samotných upozornění)
+# Změny, o kterých upozorňujeme (ne přepnutí samotných upozornění)
 _NOTIFY_FIELDS = set(EDITABLE_FIELDS) - {"notify_email", "notify_sms", "sync_deputy_cal", "sync_assistant_cal"}
 
 
-def _notify_assistant(task: Task, user: UserRole, event: str, changes: str | None = None) -> list[str]:
-    """E-mail / SMS asistentce, když úkol zadá nebo změní náměstek. Vrací varování."""
-    if user != UserRole.DEPUTY:
+def notification_recipient(task_or_private) -> UserRole:
+    """Soukromé úkoly → náměstek, pracovní → asistentka."""
+    private = task_or_private if isinstance(task_or_private, bool) else bool(task_or_private.is_private)
+    return UserRole.DEPUTY if private else UserRole.ASSISTANT
+
+
+def _notify_recipient(task: Task, user: UserRole, event: str, changes: str | None = None) -> list[str]:
+    """E-mail / SMS: pracovní úkol od náměstka → asistentce, soukromý úkol → jen náměstkovi."""
+    if not task.is_private and user != UserRole.DEPUTY:
         return []
+    who = notification_recipient(task)
+    email, phone = get_contact(who, "email"), get_contact(who, "phone")
     warnings = []
-    if task.notify_email and config.ASSISTANT_EMAIL:
+    if task.notify_email and email:
         try:
-            notify_service.send_task_email(config.ASSISTANT_EMAIL, task, event, changes)
+            notify_service.send_task_email(email, task, event, changes)
         except Exception as exc:
-            log.warning("E-mail asistentce se nepodařilo odeslat: %s", exc)
-            warnings.append(f"E-mail pro {UserRole.ASSISTANT.value} se nepodařilo odeslat: {exc}")
-    if task.notify_sms and config.ASSISTANT_PHONE:
+            log.warning("E-mail (%s) se nepodařilo odeslat: %s", who.value, exc)
+            warnings.append(f"E-mail pro {who.value} se nepodařilo odeslat: {exc}")
+    if task.notify_sms and phone:
         try:
-            notify_service.send_task_sms(config.ASSISTANT_PHONE, task, event)
+            notify_service.send_task_sms(phone, task, event)
         except Exception as exc:
-            log.warning("SMS asistentce se nepodařilo odeslat: %s", exc)
-            warnings.append(f"SMS pro {UserRole.ASSISTANT.value} se nepodařilo odeslat: {exc}")
+            log.warning("SMS (%s) se nepodařilo odeslat: %s", who.value, exc)
+            warnings.append(f"SMS pro {who.value} se nepodařilo odeslat: {exc}")
     return warnings
 
 
@@ -155,11 +207,15 @@ def check_deadline_notifications() -> int:
             Task.deadline_notified_at.is_(None),
         )).all()
         for t in tasks:
-            target = f" ({t.assignee_target})" if t.assignee_target else ""
-            notify_service.notify(
-                "⏰ Závazek do 24 hodin",
-                f"{t.code}: {t.title}{target}\nTermín: {fmt_dt(t.due_date)}",
-            )
+            if t.is_private:
+                # soukromé nesmí do společných kanálů (Telegram, webhook…) – jen náměstkovi
+                _notify_recipient(t, UserRole.DEPUTY, "Závazek do 24 hodin")
+            else:
+                target = f" ({t.assignee_target})" if t.assignee_target else ""
+                notify_service.notify(
+                    "⏰ Závazek do 24 hodin",
+                    f"{t.code}: {t.title}{target}\nTermín: {fmt_dt(t.due_date)}",
+                )
             t.deadline_notified_at = utcnow()
             sent += 1
     return sent
@@ -167,15 +223,20 @@ def check_deadline_notifications() -> int:
 
 # --- CRUD ---
 
-def list_tasks(include_inactive: bool = True) -> list[Task]:
+def list_tasks(include_inactive: bool = True, viewer: UserRole | None = None) -> list[Task]:
     q = select(Task).order_by(Task.due_date.is_(None), Task.due_date, Task.id)
     if not include_inactive:
         q = q.where(Task.status.in_(ACTIVE_STATUSES))
+    if hides_private(viewer):
+        q = q.where(Task.is_private.is_(False))
     return list(db.session.scalars(q).all())
 
 
-def get_task(task_id: int) -> Task | None:
-    return db.session.get(Task, task_id)
+def get_task(task_id: int, viewer: UserRole | None = None) -> Task | None:
+    task = db.session.get(Task, task_id)
+    if task is not None and task.is_private and hides_private(viewer):
+        return None  # pro asistentku soukromý úkol neexistuje
+    return task
 
 
 def _apply_commitment_rule(data: dict) -> dict:
@@ -192,19 +253,22 @@ _NEW_COLUMNS = {
     "subcategory": "VARCHAR(64)",
     "notify_email": "BOOLEAN NOT NULL DEFAULT 1",
     "notify_sms": "BOOLEAN NOT NULL DEFAULT 1",
+    "is_private": "BOOLEAN NOT NULL DEFAULT 0",
 }
+_NEW_HISTORY_COLUMNS = {"is_private": "BOOLEAN NOT NULL DEFAULT 0"}
 
 
 def ensure_schema() -> None:
     """Doplní do existující databáze sloupce přidané v novějších verzích (ALTER TABLE)."""
     from sqlalchemy import inspect, text
-    columns = {c["name"] for c in inspect(db.engine).get_columns("tasks")}
-    missing = {k: v for k, v in _NEW_COLUMNS.items() if k not in columns}
-    if missing:
-        with db.engine.begin() as conn:
-            for name, ddl in missing.items():
-                conn.execute(text(f"ALTER TABLE tasks ADD COLUMN {name} {ddl}"))
-        log.info("Databáze: přidány sloupce %s", ", ".join(missing))
+    for table, wanted in (("tasks", _NEW_COLUMNS), ("task_history", _NEW_HISTORY_COLUMNS)):
+        columns = {c["name"] for c in inspect(db.engine).get_columns(table)}
+        missing = {k: v for k, v in wanted.items() if k not in columns}
+        if missing:
+            with db.engine.begin() as conn:
+                for name, ddl in missing.items():
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+            log.info("Databáze: do %s přidány sloupce %s", table, ", ".join(missing))
 
 
 def apply_commitment_rule_to_existing() -> int:
@@ -223,8 +287,18 @@ def apply_commitment_rule_to_existing() -> int:
     return len(tasks)
 
 
+def _apply_privacy_rule(data: dict, user: UserRole) -> dict:
+    """Soukromé úkoly smí zakládat jen náměstek a nikdy nejdou do kalendáře asistentky."""
+    data = dict(data)
+    if user != UserRole.DEPUTY:
+        data.pop("is_private", None)
+    if data.get("is_private"):
+        data["sync_assistant_cal"] = False
+    return data
+
+
 def create_task(data: dict, user: UserRole) -> tuple[Task, list[str]]:
-    data = _apply_commitment_rule(data)
+    data = _apply_privacy_rule(_apply_commitment_rule(data), user)
     with get_session() as s:
         task = Task(creator=user, **{k: v for k, v in data.items() if k in EDITABLE_FIELDS})
         s.add(task)
@@ -236,15 +310,15 @@ def create_task(data: dict, user: UserRole) -> tuple[Task, list[str]]:
         _log(s, task, user, "Vytvořeno", "; ".join(details))
     if user == UserRole.ASSISTANT and task.priority == Priority.URGENT:
         _notify_urgent(task)
-    warnings += _notify_assistant(task, user, "Nový úkol")
+    warnings += _notify_recipient(task, user, "Nový soukromý úkol" if task.is_private else "Nový úkol")
     return task, warnings
 
 
 def update_task(task_id: int, data: dict, user: UserRole) -> tuple[Task | None, list[str]]:
-    data = _apply_commitment_rule(data)
+    data = _apply_privacy_rule(_apply_commitment_rule(data), user)
     with get_session() as s:
         task = s.get(Task, task_id)
-        if task is None:
+        if task is None or (task.is_private and user != UserRole.DEPUTY):
             return None, ["Úkol neexistuje."]
         changes, changed = [], set()
         for field, new in data.items():
@@ -259,14 +333,18 @@ def update_task(task_id: int, data: dict, user: UserRole) -> tuple[Task | None, 
             return task, []
         if "due_date" in changed:
             task.deadline_notified_at = None
+        if "is_private" in changed:
+            # dosavadní historie úkolu se skryje / zpřístupní spolu s ním
+            s.execute(db.update(TaskHistory).where(TaskHistory.task_id == task.id)
+                      .values(is_private=bool(task.is_private)))
         warnings = _sync_calendar(task, changed)
         _log(s, task, user, _action_for(changed), "; ".join(changes))
     if ("priority" in changed and user == UserRole.ASSISTANT
             and task.priority == Priority.URGENT and task.status in ACTIVE_STATUSES):
         _notify_urgent(task)
     if changed & _NOTIFY_FIELDS:
-        summary = "; ".join(c for c in changes if not c.startswith(("E-mail –", "SMS –")))
-        warnings += _notify_assistant(task, user, "Změna úkolu", summary)
+        summary = "; ".join(c for c in changes if not c.startswith(("Upozornění ",)))
+        warnings += _notify_recipient(task, user, "Změna úkolu", summary)
     return task, warnings
 
 
@@ -277,7 +355,7 @@ def set_status(task_id: int, status: TaskStatus, user: UserRole) -> tuple[Task |
 def delete_task(task_id: int, user: UserRole) -> list[str]:
     with get_session() as s:
         task = s.get(Task, task_id)
-        if task is None:
+        if task is None or (task.is_private and user != UserRole.DEPUTY):
             return ["Úkol neexistuje."]
         task.sync_deputy_cal = task.sync_assistant_cal = False
         warnings = _sync_calendar(task)
@@ -285,32 +363,43 @@ def delete_task(task_id: int, user: UserRole) -> list[str]:
         s.flush()
         s.expunge(task)
         s.execute(db.delete(Task).where(Task.id == task_id))
-    warnings += _notify_assistant(task, user, "Úkol smazán")
+    warnings += _notify_recipient(task, user, "Úkol smazán")
     return warnings
 
 
 def clear_history(user: UserRole) -> int:
-    """Smaže celou historii změn; ponechá jediný záznam o tom, kdo ji smazal."""
+    """Smaže historii změn, kterou uživatel vidí; ponechá záznam o tom, kdo ji smazal.
+
+    Asistentka maže jen pracovní záznamy – soukromou historii náměstka nevidí ani nesmaže.
+    """
     with get_session() as s:
-        count = s.execute(db.delete(TaskHistory)).rowcount
+        q = db.delete(TaskHistory)
+        if user != UserRole.DEPUTY:
+            q = q.where(TaskHistory.is_private.is_(False))
+        count = s.execute(q).rowcount
         s.add(TaskHistory(task_id=None, task_code="—", task_title=None, user=user,
                           action="Historie smazána", changes_summary=f"Smazáno {count} záznamů"))
     return count
 
 
-def known_delegates(limit: int = 30) -> list[str]:
+def known_delegates(limit: int = 30, viewer: UserRole | None = None) -> list[str]:
     """Dříve použitá jména v „Zadáno komu“ (nabídka při psaní)."""
+    q = select(Task.delegated_to).where(Task.delegated_to.is_not(None), Task.delegated_to != "")
+    if hides_private(viewer):
+        q = q.where(Task.is_private.is_(False))
     rows = db.session.execute(
-        select(Task.delegated_to).where(Task.delegated_to.is_not(None), Task.delegated_to != "")
-        .group_by(Task.delegated_to).order_by(db.func.max(Task.updated_at).desc()).limit(limit)
+        q.group_by(Task.delegated_to).order_by(db.func.max(Task.updated_at).desc()).limit(limit)
     ).scalars().all()
     return list(rows)
 
 
-def get_history(task_id: int | None = None, limit: int = 500) -> list[TaskHistory]:
+def get_history(task_id: int | None = None, limit: int = 500,
+                viewer: UserRole | None = None) -> list[TaskHistory]:
     q = select(TaskHistory).order_by(TaskHistory.timestamp.desc(), TaskHistory.id.desc())
     if task_id is not None:
         q = q.where(TaskHistory.task_id == task_id)
+    if hides_private(viewer):
+        q = q.where(TaskHistory.is_private.is_(False))
     return list(db.session.scalars(q.limit(limit)).all())
 
 
