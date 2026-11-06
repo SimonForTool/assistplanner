@@ -71,6 +71,8 @@ výchozí hodnoty `DEPUTY_EMAIL` / `DEPUTY_PHONE` a `ASSISTANT_EMAIL` / `ASSISTA
 Když úkol zadá nebo změní náměstek, asistentka dostane e-mail (s přílohou `.ics` pro přidání do kalendáře)
 a SMS. U každého úkolu lze obojí vypnout. Příjemce: `ASSISTANT_EMAIL`, `ASSISTANT_PHONE` v `.env`;
 odesílání: SMTP (`SMTP_*`) a SMS přes Twilio (`TWILIO_*`). Bez nich se zprávy jen zalogují.
+Ověření nastavení: v aplikaci *Moje kontakty → Odeslat zkušební e-mail a SMS*, nebo v konzoli
+`flask --app wsgi test-notify --email adresa@example.cz --phone +420123456789`.
 
 ## Integrace
 

@@ -5,6 +5,8 @@ PythonAnywhere:     viz wsgi.py a README.md
 """
 import logging
 import mimetypes
+
+import click
 import secrets
 import time
 
@@ -106,6 +108,15 @@ def create_app() -> Flask:
     def _check_deadlines_cmd():
         """Pošle upozornění na závazky s termínem do 24 h (pro plánovanou úlohu)."""
         print(f"Odesláno upozornění: {task_service.check_deadline_notifications()}")
+
+    @app.cli.command("test-notify")
+    @click.option("--email", default="", help="Adresa pro zkušební e-mail")
+    @click.option("--phone", default="", help="Telefon pro zkušební SMS (+420…)")
+    def _test_notify_cmd(email, phone):
+        """Ověří nastavení SMTP / Twilio odesláním zkušební zprávy."""
+        from services import notify_service
+        for kind, result in notify_service.send_test(email or None, phone or None).items():
+            print(f"{kind}: {result}")
 
     @app.cli.command("seed")
     def _seed_cmd():

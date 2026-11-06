@@ -85,6 +85,9 @@ SMTP_PORT = int(_env("SMTP_PORT", "587") or 587)
 SMTP_USER = _env("SMTP_USER")
 SMTP_PASSWORD = _env("SMTP_PASSWORD")
 SMTP_FROM = _env("SMTP_FROM")
+SMTP_FROM_NAME = _env("SMTP_FROM_NAME", "Syncho")
+# ssl (port 465) / starttls (port 587) / none; prázdné = podle portu
+SMTP_SECURITY = _env("SMTP_SECURITY").lower()
 NOTIFY_EMAIL_TO = _env("NOTIFY_EMAIL_TO")
 
 
@@ -97,7 +100,7 @@ def graph_enabled() -> bool:
 
 
 def email_enabled() -> bool:
-    return bool(SMTP_HOST)
+    return bool(SMTP_HOST and (SMTP_FROM or SMTP_USER))
 
 
 def sms_enabled() -> bool:

@@ -1,5 +1,6 @@
 """Přihlášení a volba profilu (náměstek / asistentka, jména z config)."""
 import hmac
+import re
 from functools import wraps
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
@@ -64,16 +65,33 @@ def profile():
 
     role = current_role()
     if request.method == "POST":
+        from services.notify_service import normalize_phone
+
         email = request.form.get("email", "").strip()
-        phone = request.form.get("phone", "").strip()
+        phone = normalize_phone(request.form.get("phone", "").strip())
         if email and "@" not in email:
             flash("Zadejte platný e-mail.", "danger")
-        elif phone and not phone.replace(" ", "").lstrip("+").isdigit():
+        elif phone and not re.fullmatch(r"\+\d{8,15}", phone):
             flash("Telefon zadejte ve tvaru +420 123 456 789.", "danger")
         else:
-            task_service.set_contacts(role, email, phone.replace(" ", ""))
+            task_service.set_contacts(role, email, phone)
             flash("Kontakty byly uloženy.", "success")
             return redirect(url_for("auth.profile"))
     return render_template("profile.html",
                            email=task_service.get_contact(role, "email"),
                            phone=task_service.get_contact(role, "phone"))
+
+
+@bp.route("/profile/test", methods=["POST"])
+@login_required
+def profile_test():
+    """Pošle zkušební e-mail a SMS na uložené kontakty a ukáže výsledek."""
+    from services import notify_service, task_service
+
+    role = current_role()
+    results = notify_service.send_test(task_service.get_contact(role, "email"),
+                                       task_service.get_contact(role, "phone"))
+    for kind, result in results.items():
+        flash(f"{kind[0].upper() + kind[1:]}: {result}", "success" if result == "odesláno" else
+              "info" if result.startswith(("není", "na serveru")) else "danger")
+    return redirect(url_for("auth.profile"))
