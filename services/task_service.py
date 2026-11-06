@@ -31,12 +31,13 @@ EDITABLE_FIELDS = {
     "description": "Popis",
     "task_type": "Typ",
     "assignee_target": "Komu slíbeno",
+    "delegated_to": "Zadáno komu",
     "location": "Místo",
     "priority": "Priorita",
     "status": "Stav",
     "due_date": "Termín",
-    "sync_deputy_cal": "Kalendář náměstka",
-    "sync_assistant_cal": "Kalendář asistentky",
+    "sync_deputy_cal": f"Kalendář – {UserRole.DEPUTY.value}",
+    "sync_assistant_cal": f"Kalendář – {UserRole.ASSISTANT.value}",
 }
 CALENDAR_FIELDS = ("title", "description", "location", "due_date")
 
@@ -104,7 +105,7 @@ def _sync_calendar(task: Task, changed: set[str] | None = None) -> list[str]:
 
 def _notify_urgent(task: Task) -> None:
     notify_service.notify(
-        "🔴 Urgentní úkol od asistentky",
+        f"🔴 Urgentní úkol – zadal(a) {UserRole.ASSISTANT.value}",
         f"{task.code}: {task.title}\nTermín: {fmt_dt(task.due_date)}"
         + (f"\nMísto: {task.location}" if task.location else ""),
     )
@@ -152,6 +153,16 @@ def _apply_commitment_rule(data: dict) -> dict:
     if (data.get("assignee_target") or "").strip():
         data = {**data, "task_type": TaskType.COMMITMENT}
     return data
+
+
+def ensure_schema() -> None:
+    """Doplní sloupce přidané v novějších verzích do existující databáze (SQLite ALTER TABLE)."""
+    from sqlalchemy import inspect, text
+    columns = {c["name"] for c in inspect(db.engine).get_columns("tasks")}
+    if "delegated_to" not in columns:
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN delegated_to VARCHAR(255)"))
+        log.info("Databáze: přidán sloupec tasks.delegated_to")
 
 
 def apply_commitment_rule_to_existing() -> int:
@@ -230,6 +241,15 @@ def delete_task(task_id: int, user: UserRole) -> list[str]:
     return warnings
 
 
+def known_delegates(limit: int = 30) -> list[str]:
+    """Dříve použitá jména v „Zadáno komu“ (nabídka při psaní)."""
+    rows = db.session.execute(
+        select(Task.delegated_to).where(Task.delegated_to.is_not(None), Task.delegated_to != "")
+        .group_by(Task.delegated_to).order_by(db.func.max(Task.updated_at).desc()).limit(limit)
+    ).scalars().all()
+    return list(rows)
+
+
 def get_history(task_id: int | None = None, limit: int = 500) -> list[TaskHistory]:
     q = select(TaskHistory).order_by(TaskHistory.timestamp.desc(), TaskHistory.id.desc())
     if task_id is not None:
@@ -248,7 +268,8 @@ def is_aging(t: Task, days: int) -> bool:
 
 
 def filter_tasks(tasks: list[Task], search: str = "", statuses=(), priorities=(),
-                 creators=(), task_type: TaskType | None = None) -> list[Task]:
+                 creators=(), task_type: TaskType | None = None,
+                 delegated: bool = False) -> list[Task]:
     s = search.strip().lower()
     return [
         t for t in tasks
@@ -256,8 +277,9 @@ def filter_tasks(tasks: list[Task], search: str = "", statuses=(), priorities=()
         and (not priorities or t.priority in priorities)
         and (not creators or t.creator in creators)
         and (task_type is None or t.task_type == task_type)
-        and (not s or s in " ".join(filter(None, [t.code, t.title, t.description,
-                                                   t.assignee_target, t.location])).lower())
+        and (not delegated or bool(t.delegated_to))
+        and (not s or s in " ".join(filter(None, [t.code, t.title, t.description, t.assignee_target,
+                                                   t.delegated_to, t.location])).lower())
     ]
 
 

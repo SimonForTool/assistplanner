@@ -176,6 +176,8 @@ def to_nominative(phrase: str) -> str:
             out.append(_surname_nom(word, gender))
             after_name = False
             continue
+        if out and word.islower() and word.endswith("u"):
+            break  # předmět věty („hejtmanovi analýzu…“), ne součást jména
         out.append(word)  # doplňky („zdravotnictví“, „z MF“, „kraje“) beze změny
         after_name = False
     return " ".join(out).strip()

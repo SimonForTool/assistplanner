@@ -18,6 +18,7 @@
       <div class="meta">
         <span class="{{ 'overdue' if is_overdue(t) }}">🗓️ {{ t.due_date|dt }}{{ ' · po termínu' if is_overdue(t) }}</span>
         {% if t.assignee_target %}<span>👤 {{ t.assignee_target }}</span>{% endif %}
+        {% if t.delegated_to %}<span>👉 {{ t.delegated_to }}</span>{% endif %}
         {% if t.location %}<span>📍 {{ t.location }}</span>{% endif %}
       </div>
       <div class="tags">
@@ -73,6 +74,13 @@
       <div class="form-text small">Vyplněním se úkol zařadí do „Co komu slíbil“.</div>
     </div>
     <div class="col-sm-6">
+      <label class="form-label" for="delegated_to">👉 Zadáno komu</label>
+      <input class="form-control" id="delegated_to" name="delegated_to" maxlength="255"
+             value="{{ v.get('delegated_to') or '' }}" list="delegates" autocomplete="off">
+      <div class="form-text small">Vyplňte, pokud úkol neplní {{ UserRole.DEPUTY.value }} sám.</div>
+      <datalist id="delegates">{% for d in known_delegates() %}<option value="{{ d }}">{% endfor %}</datalist>
+    </div>
+    <div class="col-sm-6">
       <label class="form-label" for="location">Místo</label>
       <input class="form-control" id="location" name="location" maxlength="255"
              value="{{ v.get('location') or '' }}">
@@ -98,14 +106,14 @@
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_deputy_cal" name="sync_deputy_cal" {{ 'checked' if v.get('sync_deputy_cal') }}>
-        <label class="form-check-label" for="sync_deputy_cal">Do kalendáře náměstka
+        <label class="form-check-label" for="sync_deputy_cal">Do kalendáře – {{ UserRole.DEPUTY.value }}
           {% if settings.MS_DEPUTY_MAILBOX %}<span class="d-block small text-body-secondary">{{ settings.MS_DEPUTY_MAILBOX }}{{ '' if settings.graph_enabled() else ' · Outlook nepřipojen' }}</span>{% endif %}</label>
       </div>
     </div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="sync_assistant_cal" name="sync_assistant_cal" {{ 'checked' if v.get('sync_assistant_cal') }}>
-        <label class="form-check-label" for="sync_assistant_cal">Do kalendáře asistentky
+        <label class="form-check-label" for="sync_assistant_cal">Do kalendáře – {{ UserRole.ASSISTANT.value }}
           {% if settings.MS_ASSISTANT_MAILBOX %}<span class="d-block small text-body-secondary">{{ settings.MS_ASSISTANT_MAILBOX }}{{ '' if settings.graph_enabled() else ' · Outlook nepřipojen' }}</span>{% endif %}</label>
       </div>
     </div>

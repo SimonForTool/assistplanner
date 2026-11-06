@@ -31,6 +31,7 @@ def parse_filters(args, default_active: bool = True) -> dict:
         "statuses": statuses,
         "priorities": [p for p in (enum_by_name(Priority, v) for v in args.getlist("priority")) if p],
         "creators": [c for c in (enum_by_name(UserRole, v) for v in args.getlist("creator")) if c],
+        "delegated": args.get("delegated") == "1",
     }
 
 
@@ -105,12 +106,12 @@ def briefing():
 
 # --- Export ---
 
-EXPORT_COLUMNS = ["ID", "Název", "Typ", "Komu slíbeno", "Místo", "Priorita", "Stav",
+EXPORT_COLUMNS = ["ID", "Název", "Typ", "Komu slíbeno", "Zadáno komu", "Místo", "Priorita", "Stav",
                   "Termín", "Zadal(a)", "Popis"]
 
 
 def _export_rows(tasks: list[Task]) -> list[list[str]]:
-    return [[t.code, t.title, t.task_type.value, t.assignee_target or "", t.location or "",
+    return [[t.code, t.title, t.task_type.value, t.assignee_target or "", t.delegated_to or "", t.location or "",
              t.priority.value, t.status.value, fmt_dt(t.due_date) if t.due_date else "",
              t.creator.value, t.description or ""] for t in tasks]
 

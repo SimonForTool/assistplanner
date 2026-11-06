@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 
+import config
+
 db = SQLAlchemy()
 
 
@@ -32,8 +34,9 @@ class TaskStatus(enum.Enum):
 
 
 class UserRole(enum.Enum):
-    DEPUTY = "Náměstek"
-    ASSISTANT = "Asistentka"
+    # V databázi se ukládá název (DEPUTY / ASSISTANT), hodnota je jen zobrazované jméno
+    DEPUTY = config.DEPUTY_NAME
+    ASSISTANT = config.ASSISTANT_NAME
 
 
 class Task(db.Model):
@@ -46,6 +49,7 @@ class Task(db.Model):
     description = db.Column(db.Text, nullable=True)
     task_type = db.Column(db.Enum(TaskType), default=TaskType.STANDARD, nullable=False)
     assignee_target = db.Column(db.String(255), nullable=True)  # Komu slíbeno / cílová osoba
+    delegated_to = db.Column(db.String(255), nullable=True)  # Komu byl úkol zadán k vyřízení
     creator = db.Column(db.Enum(UserRole), nullable=False)
     location = db.Column(db.String(255), nullable=True)
     priority = db.Column(db.Enum(Priority), default=Priority.MEDIUM, nullable=False)

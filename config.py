@@ -16,6 +16,9 @@ def _env(name: str, default: str = "") -> str:
 # --- Aplikace ---
 APP_NAME = "Syncho"
 APP_TAGLINE = "Assistant Planner"
+# Zobrazovaná jména profilů (role zůstávají: náměstek / asistentka)
+DEPUTY_NAME = _env("DEPUTY_NAME", "Michal") or "Michal"
+ASSISTANT_NAME = _env("ASSISTANT_NAME", "Hanka") or "Hanka"
 
 
 def _secret_key() -> str:

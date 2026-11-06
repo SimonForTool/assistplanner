@@ -35,6 +35,7 @@ def form_to_data(form, with_status: bool = False) -> dict:
         "task_type": enum_by_name(TaskType, form.get("task_type"), TaskType.STANDARD),
         "priority": enum_by_name(Priority, form.get("priority"), Priority.MEDIUM),
         "assignee_target": form.get("assignee_target", "").strip() or None,
+        "delegated_to": form.get("delegated_to", "").strip() or None,
         "location": form.get("location", "").strip() or None,
         "due_date": parse_dt(form.get("due_date")),
         "description": form.get("description", "").strip() or None,
@@ -127,6 +128,7 @@ def ai_extract():
         "priority": next((p.name for p in Priority if p.value == result.get("priority")),
                          Priority.MEDIUM.name),
         "assignee_target": result.get("assignee_target") or "",
+        "delegated_to": result.get("delegated_to") or "",
         "location": result.get("location") or "",
         "due_date": due.strftime("%Y-%m-%dT%H:%M") if due else "",
     }

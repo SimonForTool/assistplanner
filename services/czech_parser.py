@@ -188,6 +188,8 @@ SEGMENT_KEYS = [
     ("location", r"\bmísto(?:\s+konání)?(?:\s+(?:bude|je|konání))?\s*:?"),
     ("due", r"\b(?:termín|datum|kdy)(?:\s+(?:bude|je|:))?\s*:?"),
     ("note", r"\b(?:do\s+poznámky|poznámka(?:\s+je)?|poznámku|do\s+popisu|popis)\s*:?"),
+    ("delegate", r"\b(?:zadáno(?:\s+komu)?|zadat(?:\s+to)?|zadej(?:\s+to)?|zadal[a]?\s+jsem(?:\s+to)?|"
+                 r"deleguj\w*(?:\s+(?:to|na))?|přiděl\w*(?:\s+to)?|vyřídí|má\s+na\s+starosti|zodpovídá|řeší)\s*:?"),
     ("person", r"\bkomu(?:\s+slíbeno)?\s*:?"),
     ("priority", r"\bpriorita(?:\s+(?:bude|je))?\s*:?"),
     ("title", r"\bnázev(?:\s+(?:bude|je))?\s*:?"),
@@ -235,7 +237,9 @@ def _segments(text: str) -> tuple[str, dict[str, str]]:
     parts: dict[str, str] = {}
     for i, (start, end, key) in enumerate(clean):
         stop = clean[i + 1][0] if i + 1 < len(clean) else len(text)
-        value = text[end:stop].strip(" ,.;:-–")
+        value = text[end:stop].strip(" ,;:-–")
+        if key != "due":  # tečku u termínu nechat („30. 10.“)
+            value = value.strip(" .")
         if value and key not in parts:
             parts[key] = value
     return head.strip(" ,.;:-–"), parts
@@ -361,6 +365,7 @@ def extract_task(text: str, now: datetime | None = None) -> dict:
         "priority": priority.value,
         "due_date": due.strftime("%Y-%m-%d %H:%M") if due else None,
         "description": note,
+        "delegated_to": to_nominative(parts["delegate"]) if parts.get("delegate") else None,
         # text mimo klíčová slova („místo …“, „termín …“) – pro doplnění poznámky
         "remainder": _capitalize(head) or None,
     }

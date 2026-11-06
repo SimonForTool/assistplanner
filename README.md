@@ -54,6 +54,11 @@ python app.py               # http://localhost:5000
 > Bezplatný účet PythonAnywhere povoluje odchozí spojení jen na schválené domény. OpenAI,
 > Microsoft Graph i Telegram na seznamu jsou; vlastní SMTP server nebo webhook být nemusí.
 
+## Profily
+
+Zobrazovaná jména profilů se nastavují v `.env` (`DEPUTY_NAME`, výchozí *Michal*; `ASSISTANT_NAME`, výchozí *Hanka*).
+V databázi se ukládá jen role, takže přejmenování nemění data.
+
 ## Integrace
 
 Všechny jsou volitelné. Bez klíčů aplikace běží v omezeném režimu:

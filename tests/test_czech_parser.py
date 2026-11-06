@@ -32,6 +32,10 @@ CASES = [
     ("Zavolat Petru Svobodovi zítra ráno",
      {"title": "Telefonát: Petr Svoboda", "due_date": "2026-10-23 08:00"}),
     ("Napsat článek do zpravodaje, nespěchá", {"priority": "Nízká", "assignee_target": None}),
+    ("připravit podklady k rozpočtu termín pátek zadej to Petrovi Novákovi",
+     {"delegated_to": "Petr Novák", "assignee_target": None, "due_date": "2026-10-23 09:00"}),
+    ("slíbil jsem hejtmanovi analýzu dopravy, zadáno komu Janě Svobodové, termín 30. 10.",
+     {"assignee_target": "hejtman", "delegated_to": "Jana Svobodová", "due_date": "2026-10-30 09:00"}),
 ]
 
 

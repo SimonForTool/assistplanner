@@ -97,7 +97,7 @@
     highlight(desc);
 
     const added = [];
-    for (const name of ['assignee_target', 'location', 'due_date']) {
+    for (const name of ['assignee_target', 'delegated_to', 'location', 'due_date']) {
       if (isEmpty(name) && setField(name, fields[name])) added.push(name);
     }
     if (added.includes('assignee_target')) setField('task_type', 'COMMITMENT');
@@ -108,7 +108,7 @@
       added.push('priority');
     }
 
-    const labels = { assignee_target: 'komu slíbeno', location: 'místo', due_date: 'termín', priority: 'priorita' };
+    const labels = { assignee_target: 'komu slíbeno', delegated_to: 'zadáno komu', location: 'místo', due_date: 'termín', priority: 'priorita' };
     const extra = added.length ? ' Doplněno také: ' + added.map(n => labels[n]).join(', ') + '.' : '';
     showResult((mode === 'append' ? '✅ Poznámka doplněna.' : '✅ Poznámka nahrazena.') + extra +
                ' Nezapomeňte uložit.', 'success');

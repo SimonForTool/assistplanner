@@ -66,6 +66,9 @@
       <input type="checkbox" class="chip-check" name="status" value="{{ s.name }}" id="fs-{{ s.name }}" {{ 'checked' if s in filters.statuses }}>
       <label class="chip" for="fs-{{ s.name }}">{{ s.value }}</label>
     {% endfor %}
+    <span class="chip-sep"></span>
+    <input type="checkbox" class="chip-check" name="delegated" value="1" id="f-delegated" {{ 'checked' if filters.delegated }}>
+    <label class="chip" for="f-delegated">👉 Zadané jiným</label>
   </div>
   <div class="collapse {{ 'show' if filters.priorities or filters.creators }}" id="more-filters">
     <div class="chips">

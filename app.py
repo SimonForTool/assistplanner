@@ -58,6 +58,7 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        task_service.ensure_schema()
         if config.SEED_DEMO_DATA:
             task_service.seed_demo_data()
         task_service.apply_commitment_rule_to_existing()
@@ -93,6 +94,7 @@ def create_app() -> Flask:
             "PRIORITY_BADGES": helpers.PRIORITY_BADGES,
             "STATUS_BADGES": helpers.STATUS_BADGES,
             "is_overdue": task_service.is_overdue,
+            "known_delegates": task_service.known_delegates,
             "settings": config,
         }
 

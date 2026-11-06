@@ -1,4 +1,4 @@
-"""Přihlášení a volba role (Náměstek / Asistentka)."""
+"""Přihlášení a volba profilu (náměstek / asistentka, jména z config)."""
 import hmac
 from functools import wraps
 

@@ -21,6 +21,7 @@
     {% if task.assignee_target %}<div class="info-item"><span>👤</span><span><span class="lbl">{{ 'Komu slíbeno' if task.is_commitment else 'Pro koho' }}</span>{{ task.assignee_target }}</span></div>{% endif %}
     {% if task.location %}<div class="info-item"><span>📍</span><span><span class="lbl">Místo</span>{{ task.location }}</span></div>{% endif %}
     <div class="info-item"><span>✍️</span><span><span class="lbl">Zadal(a)</span>{{ task.creator.value }}</span></div>
+    {% if task.delegated_to %}<div class="info-item"><span>👉</span><span><span class="lbl">Zadáno komu</span>{{ task.delegated_to }}</span></div>{% endif %}
 
   </div>
 

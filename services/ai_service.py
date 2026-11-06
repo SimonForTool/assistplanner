@@ -44,13 +44,14 @@ TASK_SCHEMA = {
             "title": {"type": "string"},
             "task_type": {"type": "string", "enum": [t.value for t in TaskType]},
             "assignee_target": {"type": ["string", "null"]},
+            "delegated_to": {"type": ["string", "null"]},
             "location": {"type": ["string", "null"]},
             "priority": {"type": "string", "enum": [p.value for p in Priority]},
             "due_date": {"type": ["string", "null"],
                          "description": "Formát YYYY-MM-DD HH:MM nebo null"},
             "description": {"type": ["string", "null"]},
         },
-        "required": ["title", "task_type", "assignee_target", "location",
+        "required": ["title", "task_type", "assignee_target", "delegated_to", "location",
                      "priority", "due_date", "description"],
     },
 }
@@ -66,6 +67,8 @@ Pravidla:
 - assignee_target: osoba nebo instituce, které bylo něco slíbeno / které se úkol týká,
   VŽDY v 1. pádě a se správnými velkými písmeny („Pavlu novotnému“ → „Pavel Novotný“,
   „panu ministrovi zdravotnictví“ → „ministr zdravotnictví“). Oslovení pan/paní vynech. Jinak null.
+- delegated_to: komu náměstek úkol zadal / delegoval k vyřízení („zadej to Petrovi Novákovi“ →
+  „Petr Novák“), v 1. pádě; pokud ho řeší sám, null. Není totéž co assignee_target (komu je slíbeno).
 - task_type: "{commitment}" pokud náměstek něco slíbil / přislíbil / se zavázal nebo je uvedeno, komu
   je slíbeno; jinak "{standard}".
 - location: místo konání v 1. pádě s velkým počátečním písmenem („v salonku Bratislava“ /
