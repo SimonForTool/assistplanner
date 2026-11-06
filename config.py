@@ -75,6 +75,8 @@ CALENDAR_EVENT_MINUTES = int(_env("CALENDAR_EVENT_MINUTES", "60") or 60)
 GCAL_SCRIPT_URL = _env("GCAL_SCRIPT_URL")
 GCAL_SECRET = _env("GCAL_SECRET")
 GCAL_CALENDAR_NAME = _env("GCAL_CALENDAR_NAME")  # jen pro zobrazení, např. hana.gartn@gmail.com
+# Kopie e-mailu o každém pracovním úkolu (čárkou oddělené adresy), např. sdílená schránka asistentky
+TASK_EMAIL_COPY = [a.strip() for a in _env("TASK_EMAIL_COPY").split(",") if a.strip()]
 # Hosté zvaní automaticky k nové události (čárkou oddělené e-maily); prázdné = zve se ručně
 GCAL_GUESTS = [g.strip() for g in _env("GCAL_GUESTS").split(",") if g.strip()]
 
@@ -110,8 +112,21 @@ def graph_enabled() -> bool:
     return all([MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET])
 
 
-def email_enabled() -> bool:
+def smtp_enabled() -> bool:
     return bool(SMTP_HOST and (SMTP_FROM or SMTP_USER))
+
+
+def email_enabled() -> bool:
+    """E-mail lze odeslat přes SMTP, nebo přes Google účet skriptu Apps Script."""
+    return smtp_enabled() or gcal_enabled()
+
+
+def email_via() -> str:
+    if smtp_enabled():
+        return f"{SMTP_HOST}:{SMTP_PORT}"
+    if gcal_enabled():
+        return f"Google účet {GCAL_CALENDAR_NAME or '(Apps Script)'}"
+    return ""
 
 
 def sms_enabled() -> bool:

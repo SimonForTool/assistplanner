@@ -8,7 +8,8 @@
  *  4. Nasadit → Nové nasazení → typ „Webová aplikace“:
  *       Spustit jako: Já · Kdo má přístup: Kdokoli  → Nasadit → povolit přístup ke kalendáři.
  *  5. Zkopírujte „URL webové aplikace“ (končí /exec) do GCAL_SCRIPT_URL v .env.
- * Po úpravě skriptu: Nasadit → Spravovat nasazení → upravit → Verze: Nová verze.
+ * Po úpravě skriptu: Implementovat → Spravovat implementace → ✏️ upravit → Verze: Nová verze
+ *   → Implementovat (URL zůstává stejná; Google si může znovu vyžádat povolení – nově i pro e-mail).
  */
 const SECRET = 'SEM-VLOZTE-STEJNY-TAJNY-KLIC-JAKO-GCAL_SECRET';
 const CALENDAR_ID = 'primary';  // hlavní kalendář účtu
@@ -51,6 +52,11 @@ function doPost(e) {
       if (guests.length) resource.attendees = guests.map(function (g) { return { email: g }; });
       const created = Calendar.Events.insert(resource, CALENDAR_ID, { sendUpdates: guests.length ? 'all' : 'none' });
       return out_({ ok: true, eventId: created.id });
+    }
+    if (data.action === 'mail') {
+      // e-mail z tohoto Google účtu (bez SMTP); denní limit Gmailu cca 100 příjemců
+      MailApp.sendEmail({ to: data.to, subject: data.subject, body: data.body, name: data.name || 'Syncho' });
+      return out_({ ok: true });
     }
     return out_({ ok: false, error: 'neznámá akce' });
   } catch (err) {

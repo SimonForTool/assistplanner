@@ -213,19 +213,33 @@ def notification_recipient(task_or_private) -> UserRole:
     return UserRole.DEPUTY if private else UserRole.ASSISTANT
 
 
+def email_recipients(private: bool) -> list[str]:
+    """Pracovní úkol → asistentka + kopie (TASK_EMAIL_COPY); soukromý → jen náměstek."""
+    who = notification_recipient(private)
+    addresses = [get_contact(who, "email")] + ([] if private else config.TASK_EMAIL_COPY)
+    seen, result = set(), []
+    for a in addresses:
+        if a and a.lower() not in seen:
+            seen.add(a.lower())
+            result.append(a)
+    return result
+
+
 def _notify_recipient(task: Task, user: UserRole, event: str, changes: str | None = None) -> list[str]:
-    """E-mail / SMS: pracovní úkol od náměstka → asistentce, soukromý úkol → jen náměstkovi."""
-    if not task.is_private and user != UserRole.DEPUTY:
-        return []
+    """E-mail / SMS při každém zadání, změně a smazání – ať úkol zadá kdokoli.
+
+    Pracovní úkol → asistentka (+ kopie), soukromý úkol náměstka → jen náměstek.
+    """
     who = notification_recipient(task)
-    email, phone = get_contact(who, "email"), get_contact(who, "phone")
+    phone = get_contact(who, "phone")
     warnings = []
-    if task.notify_email and email:
-        try:
-            notify_service.send_task_email(email, task, event, changes)
-        except Exception as exc:
-            log.warning("E-mail (%s) se nepodařilo odeslat: %s", who.value, exc)
-            warnings.append(f"E-mail pro {who.value} se nepodařilo odeslat: {exc}")
+    if task.notify_email:
+        for address in email_recipients(bool(task.is_private)):
+            try:
+                notify_service.send_task_email(address, task, event, changes, user)
+            except Exception as exc:
+                log.warning("E-mail (%s) se nepodařilo odeslat: %s", address, exc)
+                warnings.append(f"E-mail na {address} se nepodařilo odeslat: {exc}")
     if task.notify_sms and phone:
         try:
             notify_service.send_task_sms(phone, task, event)

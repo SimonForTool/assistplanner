@@ -40,7 +40,10 @@ def _call(payload: dict) -> dict:
         raise GCalError(f"Google Apps Script neodpověděl správně – {hint}") from exc
     if not data.get("ok"):
         error = data.get("error", "neznámá chyba")
-        if error == "unauthorized":
+        if error == "neznámá akce":
+            error = ("skript v Google účtu je starší verze – vložte aktuální google_apps_script/Syncho.gs "
+                     "a nasaďte novou verzi (Implementovat → Spravovat implementace → upravit → Nová verze)")
+        elif error == "unauthorized":
             error = "nesouhlasí tajný klíč – GCAL_SECRET v .env musí být stejný jako SECRET ve skriptu"
         raise GCalError(f"Google kalendář: {error}")
     return data
@@ -93,3 +96,8 @@ def ping() -> str:
     if not config.gcal_enabled():
         raise GCalError("Google kalendář není nastaven (GCAL_SCRIPT_URL a GCAL_SECRET v .env).")
     return _call({"action": "ping"}).get("calendar", "?")
+
+
+def send_mail(to: str, subject: str, text: str) -> None:
+    """Odešle e-mail z Google účtu skriptu (MailApp) – bez nastavování SMTP."""
+    _call({"action": "mail", "to": to, "subject": subject, "body": text, "name": config.SMTP_FROM_NAME})

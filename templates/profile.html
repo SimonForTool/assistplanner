@@ -10,7 +10,7 @@
         {% if current_role == UserRole.DEPUTY %}
           Sem se posílají upozornění na vaše <strong>soukromé úkoly</strong>. Pracovní úkoly chodí {{ UserRole.ASSISTANT.value }}.
         {% else %}
-          Sem se posílají upozornění na úkoly, které vám zadá {{ UserRole.DEPUTY.value }}.
+          Sem se posílají upozornění při každém zadání, změně a smazání pracovního úkolu.
         {% endif %}
       </p>
       <label class="form-label" for="email">✉️ E-mail</label>
@@ -36,7 +36,7 @@
   </form>
   <div class="card mt-3"><div class="card-body small">
     <div class="fw-semibold mb-1">Stav odesílání na serveru</div>
-    <div>✉️ E-mail: {% if settings.email_enabled() %}<span class="text-success fw-semibold">nastaven</span> ({{ settings.SMTP_HOST }}:{{ settings.SMTP_PORT }}){% else %}<span class="text-body-secondary">nenastaven – zprávy se jen zaznamenají</span>{% endif %}</div>
+    <div>✉️ E-mail: {% if settings.email_enabled() %}<span class="text-success fw-semibold">nastaven</span> ({{ settings.email_via() }}){% else %}<span class="text-body-secondary">nenastaven – zprávy se jen zaznamenají</span>{% endif %}</div>
     <div>📅 Google kalendář: {% if settings.gcal_enabled() %}<span class="text-success fw-semibold">nastaven</span>{{ ' (' ~ settings.GCAL_CALENDAR_NAME ~ ')' if settings.GCAL_CALENDAR_NAME }}{% else %}<span class="text-body-secondary">nenastaven – události se jen zaznamenají</span>{% endif %}</div>
     <div>📱 SMS: {% if settings.sms_enabled() %}<span class="text-success fw-semibold">nastaveny</span> (Twilio){% else %}<span class="text-body-secondary">nenastaveny – zprávy se jen zaznamenají</span>{% endif %}</div>
   </div></div>

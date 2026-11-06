@@ -40,7 +40,14 @@ def _sender() -> str:
 def deliver_email(to: str, subject: str, text: str,
                   attachments: list[tuple[bytes, str, str, str]] | None = None) -> None:
     """Odešle e-mail. attachments: (data, maintype, subtype, filename). Bez SMTP jen zaloguje."""
-    if not config.email_enabled():
+    if not config.smtp_enabled():
+        if config.gcal_enabled():
+            from services import gcal_service
+            try:
+                gcal_service.send_mail(to, subject, text)
+            except gcal_service.GCalError as exc:
+                raise DeliveryError(str(exc)) from exc
+            return
         log.info("[MOCK e-mail → %s] %s\n%s", to, subject, text)
         return
     msg = EmailMessage()
@@ -232,7 +239,7 @@ def _task_url(task) -> str | None:
     return f"{base}/tasks/{task.id}" if base else None
 
 
-def _outlook_email(task, event: str, changes: str | None) -> tuple[str, str]:
+def _outlook_email(task, event: str, changes: str | None, user=None) -> tuple[str, str]:
     """Předmět a text e-mailu s údaji v pořadí, v jakém se zapisují do události v Outlooku."""
     from datetime import timedelta
 
@@ -267,7 +274,8 @@ def _outlook_email(task, event: str, changes: str | None) -> tuple[str, str]:
     elif task.is_private:
         intro = "nový soukromý úkol:"
     else:
-        intro = f"{UserRole.DEPUTY.value} zadává nový úkol. Údaje pro zápis do kalendáře Outlook:"
+        author = (user or UserRole.DEPUTY).value
+        intro = f"{author} zadává nový úkol. Údaje pro zápis do kalendáře Outlook:"
 
     lines = ["Dobrý den,", "", intro, ""]
     if changes:
@@ -282,8 +290,8 @@ def _outlook_email(task, event: str, changes: str | None) -> tuple[str, str]:
     return subject, "\n".join(lines)
 
 
-def send_task_email(to: str, task, event: str, changes: str | None = None) -> None:
-    subject, text = _outlook_email(task, event, changes)
+def send_task_email(to: str, task, event: str, changes: str | None = None, user=None) -> None:
+    subject, text = _outlook_email(task, event, changes, user)
     attachments = []
     if config.EMAIL_ATTACH_ICS and task.due_date and event != "Úkol smazán":
         attachments.append((_ics(task), "text", "calendar", f"{task.code}.ics"))
