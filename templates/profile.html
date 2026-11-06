@@ -31,7 +31,22 @@
 
   <div class="card mt-3" id="gcal">
     <div class="card-body">
-      <div class="fw-bold mb-2">📅 Google kalendář – propojení</div>
+      {% set gcal_connected = gcal_url and gcal_name() %}
+      <div class="fw-bold mb-2">📅 Google kalendář</div>
+      {% if gcal_connected %}
+        <p class="small mb-2"><span class="tag tone-green">✅ Propojeno</span> {{ gcal_name() }}</p>
+        <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="d-grid gap-2" style="grid-template-columns: 1fr 1fr">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <button class="btn btn-soft" name="action" value="test">Otestovat</button>
+          <button class="btn btn-soft" name="action" value="sync_all"
+                  onclick="return confirm('Zapsat do Google kalendáře všechny budoucí pracovní úkoly s termínem?');">⤴️ Zapsat budoucí úkoly</button>
+        </form>
+      {% else %}
+        <p class="small text-body-secondary mb-2">Zatím nepropojeno – postup najdete v nastavení níže.</p>
+      {% endif %}
+      <details class="gcal-setup mt-2" {{ '' if gcal_connected else 'open' }}>
+        <summary class="small text-body-secondary">⚙️ Nastavení propojení</summary>
+        <div class="mt-3">
       <ol class="small ps-3 mb-3">
         <li class="mb-2">V Google skriptu (script.google.com) nahraďte <strong>celý řádek 13</strong> tímto řádkem:
           <div class="input-group mt-1">
@@ -50,19 +65,14 @@
                placeholder="https://script.google.com/macros/s/…/exec" required>
         <button class="btn btn-primary w-100" name="action" value="save_url">Uložit a otestovat</button>
       </form>
-      {% if gcal_url %}
-      <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="mt-2 d-grid gap-2" style="grid-template-columns: 1fr 1fr">
-        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-        <button class="btn btn-soft" name="action" value="test">📅 Otestovat</button>
-        <button class="btn btn-soft" name="action" value="sync_all"
-                onclick="return confirm('Zapsat do Google kalendáře všechny budoucí pracovní úkoly s termínem?');">⤴️ Zapsat budoucí úkoly</button>
-      </form>
-      {% endif %}
+
       <form method="post" action="{{ url_for('auth.profile_gcal') }}" class="mt-2 text-end">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button class="btn btn-link btn-sm p-0" name="action" value="new_secret"
                 onclick="return confirm('Vytvořit nový klíč? Starý přestane platit a skript bude potřeba upravit.');">Vytvořit nový klíč</button>
       </form>
+        </div>
+      </details>
     </div>
   </div>
   <script>

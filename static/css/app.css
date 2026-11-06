@@ -384,3 +384,6 @@ textarea.form-control { min-height: auto; }
 .privacy-pick input:checked + label { background: var(--sy-surface); color: var(--sy-navy); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
 .privacy-pick #is_private_1:checked + label { color: #a46700; }
 [data-show-private][hidden], [data-show-work][hidden] { display: none !important; }
+.gcal-setup summary { cursor: pointer; list-style: none; }
+.gcal-setup summary::-webkit-details-marker { display: none; }
+.gcal-setup[open] summary { margin-bottom: .25rem; }

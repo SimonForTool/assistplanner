@@ -109,6 +109,8 @@ def profile_gcal():
 
     action = request.form.get("action", "test")
     try:
+        if action in ("new_secret", "save_url"):
+            task_service.set_setting("gcal_calendar", "")  # „Propojeno“ až po úspěšném testu
         if action == "new_secret":
             gcal_service.ensure_secret(regenerate=True)
             flash("Vytvořen nový tajný klíč – vložte nový řádek const SECRET do skriptu a nasaďte novou verzi.",
