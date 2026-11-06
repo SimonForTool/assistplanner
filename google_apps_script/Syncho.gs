@@ -13,13 +13,20 @@
  */
 const SECRET = 'SEM-VLOZTE-STEJNY-TAJNY-KLIC-JAKO-GCAL_SECRET';
 const CALENDAR_ID = 'primary';  // hlavní kalendář účtu
+const VERSION = 2;              // verze skriptu, kterou aplikace očekává
+
+/** Kontrola v prohlížeči: otevřete URL webové aplikace (…/exec) – ukáže verzi nasazeného skriptu. */
+function doGet() {
+  return out_({ ok: true, app: 'Syncho', version: VERSION, actions: ['ping', 'upsert', 'delete', 'mail'],
+                secretSet: SECRET.indexOf('SEM-VLOZTE') !== 0 });
+}
 
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     if (data.secret !== SECRET) return out_({ ok: false, error: 'unauthorized' });
     if (data.action === 'ping') {
-      return out_({ ok: true, calendar: CalendarApp.getDefaultCalendar().getName() });
+      return out_({ ok: true, calendar: CalendarApp.getDefaultCalendar().getName(), version: VERSION });
     }
     if (data.action === 'delete') {
       try {

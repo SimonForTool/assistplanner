@@ -91,11 +91,23 @@ def delete_event(event_id: str) -> None:
     _call({"action": "delete", "eventId": event_id})
 
 
+SCRIPT_VERSION = 2  # verze google_apps_script/Syncho.gs, kterou aplikace potřebuje
+
+
 def ping() -> str:
-    """Ověří spojení se skriptem; vrátí název kalendáře."""
+    """Ověří spojení se skriptem; vrátí název kalendáře (a upozorní na starou verzi skriptu)."""
     if not config.gcal_enabled():
         raise GCalError("Google kalendář není nastaven (GCAL_SCRIPT_URL a GCAL_SECRET v .env).")
-    return _call({"action": "ping"}).get("calendar", "?")
+    data = _call({"action": "ping"})
+    name = data.get("calendar", "?")
+    version = data.get("version") or 1
+    if version < SCRIPT_VERSION:
+        raise GCalError(
+            f"Kalendář „{name}“ je připojen, ale adresa v GCAL_SCRIPT_URL vede na starou verzi skriptu "
+            f"(verze {version}, potřeba {SCRIPT_VERSION}). Buď v Google vydejte novou verzi té implementace, "
+            "nebo do .env zkopírujte adresu implementace, kterou jste aktualizoval(a)."
+        )
+    return f"{name} · skript verze {version}"
 
 
 def send_mail(to: str, subject: str, text: str) -> None:
