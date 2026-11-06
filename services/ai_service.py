@@ -45,13 +45,17 @@ TASK_SCHEMA = {
             "task_type": {"type": "string", "enum": [t.value for t in TaskType]},
             "assignee_target": {"type": ["string", "null"]},
             "delegated_to": {"type": ["string", "null"]},
+            "organization": {"type": ["string", "null"], "enum": list(config.ORGANIZATIONS) + [None]},
+            "subcategory": {"type": ["string", "null"],
+                            "enum": sorted({x for v in config.ORGANIZATIONS.values() for x in v}) + [None]},
             "location": {"type": ["string", "null"]},
             "priority": {"type": "string", "enum": [p.value for p in Priority]},
             "due_date": {"type": ["string", "null"],
                          "description": "Formát YYYY-MM-DD HH:MM nebo null"},
             "description": {"type": ["string", "null"]},
         },
-        "required": ["title", "task_type", "assignee_target", "delegated_to", "location",
+        "required": ["title", "task_type", "assignee_target", "delegated_to", "organization", "subcategory",
+                     "location",
                      "priority", "due_date", "description"],
     },
 }
@@ -69,6 +73,11 @@ Pravidla:
   „panu ministrovi zdravotnictví“ → „ministr zdravotnictví“). Oslovení pan/paní vynech. Jinak null.
 - delegated_to: komu náměstek úkol zadal / delegoval k vyřízení („zadej to Petrovi Novákovi“ →
   „Petr Novák“), v 1. pádě; pokud ho řeší sám, null. Není totéž co assignee_target (komu je slíbeno).
+- organization: VFN (Všeobecná fakultní nemocnice), ONMB (Oblastní nemocnice Mladá Boleslav),
+  MZČR (Ministerstvo zdravotnictví ČR) nebo FNKV (Fakultní nemocnice Královské Vinohrady), jen když
+  z textu jasně plyne; jinak null.
+- subcategory: jen u VFN – „AI“ (umělá inteligence), „NIS“ (nemocniční informační systém) nebo
+  „Ostatní“, když je výslovně řečeno; u jiných organizací null.
 - task_type: "{commitment}" pokud náměstek něco slíbil / přislíbil / se zavázal nebo je uvedeno, komu
   je slíbeno; jinak "{standard}".
 - location: místo konání v 1. pádě s velkým počátečním písmenem („v salonku Bratislava“ /

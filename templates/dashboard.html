@@ -69,6 +69,11 @@
     <span class="chip-sep"></span>
     <input type="checkbox" class="chip-check" name="delegated" value="1" id="f-delegated" {{ 'checked' if filters.delegated }}>
     <label class="chip" for="f-delegated">👉 Zadané jiným</label>
+    <span class="chip-sep"></span>
+    {% for org in settings.ORGANIZATIONS %}
+      <input type="checkbox" class="chip-check" name="org" value="{{ org }}" id="fo-{{ loop.index }}" {{ 'checked' if org in filters.organizations }}>
+      <label class="chip" for="fo-{{ loop.index }}">{{ org }}</label>
+    {% endfor %}
   </div>
   <div class="collapse {{ 'show' if filters.priorities or filters.creators }}" id="more-filters">
     <div class="chips">

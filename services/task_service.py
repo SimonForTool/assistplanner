@@ -4,6 +4,8 @@ UI volá výhradně tyto funkce, aby se žádná změna neobešla bez záznamu v
 """
 import logging
 from contextlib import contextmanager
+
+import config
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -32,12 +34,16 @@ EDITABLE_FIELDS = {
     "task_type": "Typ",
     "assignee_target": "Komu slíbeno",
     "delegated_to": "Zadáno komu",
+    "organization": "Organizace",
+    "subcategory": "Podkategorie",
     "location": "Místo",
     "priority": "Priorita",
     "status": "Stav",
     "due_date": "Termín",
     "sync_deputy_cal": f"Kalendář – {UserRole.DEPUTY.value}",
     "sync_assistant_cal": f"Kalendář – {UserRole.ASSISTANT.value}",
+    "notify_email": f"E-mail – {UserRole.ASSISTANT.value}",
+    "notify_sms": f"SMS – {UserRole.ASSISTANT.value}",
 }
 CALENDAR_FIELDS = ("title", "description", "location", "due_date")
 
@@ -111,6 +117,30 @@ def _notify_urgent(task: Task) -> None:
     )
 
 
+# Změny, o kterých asistentku informujeme (ne přepnutí samotných upozornění)
+_NOTIFY_FIELDS = set(EDITABLE_FIELDS) - {"notify_email", "notify_sms", "sync_deputy_cal", "sync_assistant_cal"}
+
+
+def _notify_assistant(task: Task, user: UserRole, event: str, changes: str | None = None) -> list[str]:
+    """E-mail / SMS asistentce, když úkol zadá nebo změní náměstek. Vrací varování."""
+    if user != UserRole.DEPUTY:
+        return []
+    warnings = []
+    if task.notify_email and config.ASSISTANT_EMAIL:
+        try:
+            notify_service.send_task_email(config.ASSISTANT_EMAIL, task, event, changes)
+        except Exception as exc:
+            log.warning("E-mail asistentce se nepodařilo odeslat: %s", exc)
+            warnings.append(f"E-mail pro {UserRole.ASSISTANT.value} se nepodařilo odeslat: {exc}")
+    if task.notify_sms and config.ASSISTANT_PHONE:
+        try:
+            notify_service.send_task_sms(config.ASSISTANT_PHONE, task, event)
+        except Exception as exc:
+            log.warning("SMS asistentce se nepodařilo odeslat: %s", exc)
+            warnings.append(f"SMS pro {UserRole.ASSISTANT.value} se nepodařilo odeslat: {exc}")
+    return warnings
+
+
 def check_deadline_notifications() -> int:
     """Upozorní na závazky s termínem do 24 hodin (každý jen jednou). Vrací počet odeslaných."""
     now = now_local()
@@ -155,14 +185,26 @@ def _apply_commitment_rule(data: dict) -> dict:
     return data
 
 
+# Sloupce přidané v novějších verzích: název → definice pro ALTER TABLE
+_NEW_COLUMNS = {
+    "delegated_to": "VARCHAR(255)",
+    "organization": "VARCHAR(32)",
+    "subcategory": "VARCHAR(64)",
+    "notify_email": "BOOLEAN NOT NULL DEFAULT 1",
+    "notify_sms": "BOOLEAN NOT NULL DEFAULT 1",
+}
+
+
 def ensure_schema() -> None:
-    """Doplní sloupce přidané v novějších verzích do existující databáze (SQLite ALTER TABLE)."""
+    """Doplní do existující databáze sloupce přidané v novějších verzích (ALTER TABLE)."""
     from sqlalchemy import inspect, text
     columns = {c["name"] for c in inspect(db.engine).get_columns("tasks")}
-    if "delegated_to" not in columns:
+    missing = {k: v for k, v in _NEW_COLUMNS.items() if k not in columns}
+    if missing:
         with db.engine.begin() as conn:
-            conn.execute(text("ALTER TABLE tasks ADD COLUMN delegated_to VARCHAR(255)"))
-        log.info("Databáze: přidán sloupec tasks.delegated_to")
+            for name, ddl in missing.items():
+                conn.execute(text(f"ALTER TABLE tasks ADD COLUMN {name} {ddl}"))
+        log.info("Databáze: přidány sloupce %s", ", ".join(missing))
 
 
 def apply_commitment_rule_to_existing() -> int:
@@ -194,6 +236,7 @@ def create_task(data: dict, user: UserRole) -> tuple[Task, list[str]]:
         _log(s, task, user, "Vytvořeno", "; ".join(details))
     if user == UserRole.ASSISTANT and task.priority == Priority.URGENT:
         _notify_urgent(task)
+    warnings += _notify_assistant(task, user, "Nový úkol")
     return task, warnings
 
 
@@ -221,6 +264,9 @@ def update_task(task_id: int, data: dict, user: UserRole) -> tuple[Task | None, 
     if ("priority" in changed and user == UserRole.ASSISTANT
             and task.priority == Priority.URGENT and task.status in ACTIVE_STATUSES):
         _notify_urgent(task)
+    if changed & _NOTIFY_FIELDS:
+        summary = "; ".join(c for c in changes if not c.startswith(("E-mail –", "SMS –")))
+        warnings += _notify_assistant(task, user, "Změna úkolu", summary)
     return task, warnings
 
 
@@ -237,8 +283,19 @@ def delete_task(task_id: int, user: UserRole) -> list[str]:
         warnings = _sync_calendar(task)
         _log(s, task, user, "Smazáno", f"Smazán úkol „{task.title}“ ({task.task_type.value})")
         s.flush()
-        s.delete(task)
+        s.expunge(task)
+        s.execute(db.delete(Task).where(Task.id == task_id))
+    warnings += _notify_assistant(task, user, "Úkol smazán")
     return warnings
+
+
+def clear_history(user: UserRole) -> int:
+    """Smaže celou historii změn; ponechá jediný záznam o tom, kdo ji smazal."""
+    with get_session() as s:
+        count = s.execute(db.delete(TaskHistory)).rowcount
+        s.add(TaskHistory(task_id=None, task_code="—", task_title=None, user=user,
+                          action="Historie smazána", changes_summary=f"Smazáno {count} záznamů"))
+    return count
 
 
 def known_delegates(limit: int = 30) -> list[str]:
@@ -269,7 +326,7 @@ def is_aging(t: Task, days: int) -> bool:
 
 def filter_tasks(tasks: list[Task], search: str = "", statuses=(), priorities=(),
                  creators=(), task_type: TaskType | None = None,
-                 delegated: bool = False) -> list[Task]:
+                 delegated: bool = False, organizations=()) -> list[Task]:
     s = search.strip().lower()
     return [
         t for t in tasks
@@ -278,6 +335,7 @@ def filter_tasks(tasks: list[Task], search: str = "", statuses=(), priorities=()
         and (not creators or t.creator in creators)
         and (task_type is None or t.task_type == task_type)
         and (not delegated or bool(t.delegated_to))
+        and (not organizations or t.organization in organizations)
         and (not s or s in " ".join(filter(None, [t.code, t.title, t.description, t.assignee_target,
                                                    t.delegated_to, t.location])).lower())
     ]

@@ -36,12 +36,17 @@ def form_to_data(form, with_status: bool = False) -> dict:
         "priority": enum_by_name(Priority, form.get("priority"), Priority.MEDIUM),
         "assignee_target": form.get("assignee_target", "").strip() or None,
         "delegated_to": form.get("delegated_to", "").strip() or None,
+        "organization": form.get("organization") if form.get("organization") in config.ORGANIZATIONS else None,
+        "notify_email": form.get("notify_email") == "on",
+        "notify_sms": form.get("notify_sms") == "on",
         "location": form.get("location", "").strip() or None,
         "due_date": parse_dt(form.get("due_date")),
         "description": form.get("description", "").strip() or None,
         "sync_deputy_cal": form.get("sync_deputy_cal") == "on",
         "sync_assistant_cal": form.get("sync_assistant_cal") == "on",
     }
+    subs = config.ORGANIZATIONS.get(data["organization"] or "", [])
+    data["subcategory"] = form.get("subcategory") if form.get("subcategory") in subs else None
     if with_status:
         data["status"] = enum_by_name(TaskStatus, form.get("status"), TaskStatus.OPEN)
     return data
@@ -129,6 +134,8 @@ def ai_extract():
                          Priority.MEDIUM.name),
         "assignee_target": result.get("assignee_target") or "",
         "delegated_to": result.get("delegated_to") or "",
+        "organization": result.get("organization") or "",
+        "subcategory": result.get("subcategory") or "",
         "location": result.get("location") or "",
         "due_date": due.strftime("%Y-%m-%dT%H:%M") if due else "",
     }

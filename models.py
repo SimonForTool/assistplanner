@@ -50,6 +50,8 @@ class Task(db.Model):
     task_type = db.Column(db.Enum(TaskType), default=TaskType.STANDARD, nullable=False)
     assignee_target = db.Column(db.String(255), nullable=True)  # Komu slíbeno / cílová osoba
     delegated_to = db.Column(db.String(255), nullable=True)  # Komu byl úkol zadán k vyřízení
+    organization = db.Column(db.String(32), nullable=True)  # VFN, ONMB, MZČR, FNKV (config.ORGANIZATIONS)
+    subcategory = db.Column(db.String(64), nullable=True)  # jen u organizací s podkategoriemi (VFN)
     creator = db.Column(db.Enum(UserRole), nullable=False)
     location = db.Column(db.String(255), nullable=True)
     priority = db.Column(db.Enum(Priority), default=Priority.MEDIUM, nullable=False)
@@ -61,6 +63,10 @@ class Task(db.Model):
     sync_assistant_cal = db.Column(db.Boolean, default=False, nullable=False)
     outlook_event_id_deputy = db.Column(db.String(255), nullable=True)
     outlook_event_id_assistant = db.Column(db.String(255), nullable=True)
+
+    # Upozornění asistentce (e-mail / SMS) při zadání a změnách od náměstka
+    notify_email = db.Column(db.Boolean, default=True, nullable=False)
+    notify_sms = db.Column(db.Boolean, default=True, nullable=False)
 
     # Kdy bylo odesláno upozornění na blížící se termín (aby se neposílalo opakovaně)
     deadline_notified_at = db.Column(db.DateTime, nullable=True)

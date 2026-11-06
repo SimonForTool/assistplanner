@@ -23,6 +23,7 @@
       </div>
       <div class="tags">
         {{ priority_badge(t.priority) }} {{ status_badge(t.status) }}
+        {% if t.organization %}<span class="tag tone-navy">🏥 {{ t.organization }}{{ ' · ' ~ t.subcategory if t.subcategory }}</span>{% endif %}
         <span class="tag tone-muted">✍️ {{ t.creator.value }}</span>
       </div>
     </div>
@@ -67,6 +68,38 @@
       </select>
     </div>
     <div class="col-sm-6">
+      <label class="form-label" for="organization">🏥 Organizace</label>
+      <select class="form-select" id="organization" name="organization">
+        <option value="">— neuvedeno —</option>
+        {% for org in settings.ORGANIZATIONS %}<option value="{{ org }}" {{ 'selected' if v.get('organization') == org }}>{{ org }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-sm-6" id="subcategory-wrap">
+      <label class="form-label" for="subcategory">Podkategorie</label>
+      <select class="form-select" id="subcategory" name="subcategory">
+        <option value="">— neuvedeno —</option>
+        {% for org, subs in settings.ORGANIZATIONS.items() %}{% for sub in subs %}
+          <option value="{{ sub }}" data-org="{{ org }}" {{ 'selected' if v.get('organization') == org and v.get('subcategory') == sub }}>{{ sub }}</option>
+        {% endfor %}{% endfor %}
+      </select>
+    </div>
+    <script>
+      (function () {
+        // Podkategorie jen pro organizace, které je mají (VFN)
+        const org = document.getElementById('organization'), sub = document.getElementById('subcategory');
+        const wrap = document.getElementById('subcategory-wrap');
+        function sync() {
+          let any = false;
+          sub.querySelectorAll('option[data-org]').forEach(o => {
+            const show = o.dataset.org === org.value; o.hidden = !show; o.disabled = !show; any = any || show;
+          });
+          if (sub.selectedOptions[0] && sub.selectedOptions[0].disabled) sub.value = '';
+          wrap.style.visibility = any ? 'visible' : 'hidden';
+        }
+        org.addEventListener('change', sync); sync();
+      })();
+    </script>
+    <div class="col-sm-6">
       <label class="form-label" for="assignee_target">🤝 Komu slíbeno</label>
       <input class="form-control" id="assignee_target" name="assignee_target" maxlength="255"
              value="{{ v.get('assignee_target') or '' }}"
@@ -102,6 +135,23 @@
       <label class="form-label" for="description">Popis / poznámka</label>
       <textarea class="form-control" id="description" name="description" rows="3">{{ v.get('description') or '' }}</textarea>
     </div>
+    <div class="col-12"><div class="form-label mb-0">📣 Upozornění – {{ UserRole.ASSISTANT.value }}</div>
+      <div class="form-text small mt-0">Odešle se, když úkol zadá nebo změní {{ UserRole.DEPUTY.value }}.</div></div>
+    <div class="col-sm-6">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="notify_email" name="notify_email" {{ 'checked' if v.get('notify_email', true) }}>
+        <label class="form-check-label" for="notify_email">✉️ Odeslat do e-mailu
+          <span class="d-block small text-body-secondary">{{ settings.ASSISTANT_EMAIL or 'e-mail není nastaven (ASSISTANT_EMAIL)' }}{{ ' · e-mail nepřipojen' if settings.ASSISTANT_EMAIL and not settings.email_enabled() }}</span></label>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="notify_sms" name="notify_sms" {{ 'checked' if v.get('notify_sms', true) }}>
+        <label class="form-check-label" for="notify_sms">📱 Notifikace do telefonu (SMS)
+          <span class="d-block small text-body-secondary">{{ settings.ASSISTANT_PHONE or 'telefon není nastaven (ASSISTANT_PHONE)' }}{{ ' · SMS nepřipojeny' if settings.ASSISTANT_PHONE and not settings.sms_enabled() }}</span></label>
+      </div>
+    </div>
+    {% if settings.graph_enabled() %}
     <div class="col-12"><div class="form-label mb-0">📆 Outlook kalendář</div></div>
     <div class="col-sm-6">
       <div class="form-check form-switch">
@@ -117,6 +167,7 @@
           {% if settings.MS_ASSISTANT_MAILBOX %}<span class="d-block small text-body-secondary">{{ settings.MS_ASSISTANT_MAILBOX }}{{ '' if settings.graph_enabled() else ' · Outlook nepřipojen' }}</span>{% endif %}</label>
       </div>
     </div>
+    {% endif %}
   </div>
 {% endmacro %}
 

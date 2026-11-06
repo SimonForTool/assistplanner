@@ -32,6 +32,7 @@ def parse_filters(args, default_active: bool = True) -> dict:
         "priorities": [p for p in (enum_by_name(Priority, v) for v in args.getlist("priority")) if p],
         "creators": [c for c in (enum_by_name(UserRole, v) for v in args.getlist("creator")) if c],
         "delegated": args.get("delegated") == "1",
+        "organizations": [o for o in args.getlist("org") if o in config.ORGANIZATIONS],
     }
 
 
@@ -106,12 +107,13 @@ def briefing():
 
 # --- Export ---
 
-EXPORT_COLUMNS = ["ID", "Název", "Typ", "Komu slíbeno", "Zadáno komu", "Místo", "Priorita", "Stav",
-                  "Termín", "Zadal(a)", "Popis"]
+EXPORT_COLUMNS = ["ID", "Název", "Typ", "Organizace", "Podkategorie", "Komu slíbeno", "Zadáno komu",
+                  "Místo", "Priorita", "Stav", "Termín", "Zadal(a)", "Popis"]
 
 
 def _export_rows(tasks: list[Task]) -> list[list[str]]:
-    return [[t.code, t.title, t.task_type.value, t.assignee_target or "", t.delegated_to or "", t.location or "",
+    return [[t.code, t.title, t.task_type.value, t.organization or "", t.subcategory or "",
+             t.assignee_target or "", t.delegated_to or "", t.location or "",
              t.priority.value, t.status.value, fmt_dt(t.due_date) if t.due_date else "",
              t.creator.value, t.description or ""] for t in tasks]
 
@@ -153,7 +155,7 @@ def export_xlsx():
         cell.font = Font(bold=True)
     for row in _export_rows(tasks):
         ws.append(row)
-    for col, width in zip("ABCDEFGHIJ", (11, 45, 22, 28, 22, 11, 11, 17, 12, 50)):
+    for col, width in zip("ABCDEFGHIJKLM", (11, 45, 22, 11, 12, 28, 22, 22, 11, 11, 17, 12, 50)):
         ws.column_dimensions[col].width = width
     buf = io.BytesIO()
     wb.save(buf)

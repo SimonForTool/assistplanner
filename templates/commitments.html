@@ -43,7 +43,9 @@
         {% if t.location %}<span>📍 {{ t.location }}</span>{% endif %}
         <span>✍️ {{ t.creator.value }}</span>
       </div>
-      <div class="tags">{{ status_badge(t.status) }} {{ priority_badge(t.priority) }} <span class="tag tone-muted">{{ t.code }}</span></div>
+      <div class="tags">{{ status_badge(t.status) }} {{ priority_badge(t.priority) }}
+        {% if t.organization %}<span class="tag tone-navy">🏥 {{ t.organization }}{{ ' · ' ~ t.subcategory if t.subcategory }}</span>{% endif %}
+        <span class="tag tone-muted">{{ t.code }}</span></div>
     </div>
     {% if t.status not in [TaskStatus.CLOSED, TaskStatus.CANCELLED] %}
     <form method="post" action="{{ url_for('tasks.set_status', task_id=t.id) }}" class="done-form">

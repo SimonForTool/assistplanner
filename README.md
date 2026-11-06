@@ -59,6 +59,12 @@ python app.py               # http://localhost:5000
 Zobrazovaná jména profilů se nastavují v `.env` (`DEPUTY_NAME`, výchozí *Michal*; `ASSISTANT_NAME`, výchozí *Hanka*).
 V databázi se ukládá jen role, takže přejmenování nemění data.
 
+## Upozornění pro asistentku
+
+Když úkol zadá nebo změní náměstek, asistentka dostane e-mail (s přílohou `.ics` pro přidání do kalendáře)
+a SMS. U každého úkolu lze obojí vypnout. Příjemce: `ASSISTANT_EMAIL`, `ASSISTANT_PHONE` v `.env`;
+odesílání: SMTP (`SMTP_*`) a SMS přes Twilio (`TWILIO_*`). Bez nich se zprávy jen zalogují.
+
 ## Integrace
 
 Všechny jsou volitelné. Bez klíčů aplikace běží v omezeném režimu:

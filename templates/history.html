@@ -4,7 +4,14 @@
 {% block content %}
 <div class="page-head">
   <h1>Historie změn</h1>
-  <a class="btn btn-soft btn-sm" href="{{ url_for('history.export_csv', **args) }}">⬇️ CSV</a>
+  <div class="d-flex gap-2">
+    <a class="btn btn-soft btn-sm" href="{{ url_for('history.export_csv', **args) }}">⬇️ CSV</a>
+    <form method="post" action="{{ url_for('history.clear') }}"
+          onsubmit="return confirm('Opravdu chcete smazat celou historii?');">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn btn-soft-danger btn-sm">🗑️ Smazat historii</button>
+    </form>
+  </div>
 </div>
 <form method="get" id="hist-form">
   <div class="search-wrap mb-2">

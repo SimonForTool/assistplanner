@@ -20,6 +20,18 @@ APP_TAGLINE = "Assistant Planner"
 DEPUTY_NAME = _env("DEPUTY_NAME", "Michal") or "Michal"
 ASSISTANT_NAME = _env("ASSISTANT_NAME", "Hanka") or "Hanka"
 
+# Organizace úkolu a jejich podkategorie (prázdný seznam = bez podkategorií)
+ORGANIZATIONS = {
+    "VFN": ["AI", "NIS", "Ostatní"],
+    "ONMB": [],
+    "MZČR": [],
+    "FNKV": [],
+}
+
+# Upozornění asistentce na úkoly, které zadá náměstek (u úkolu lze vypnout)
+ASSISTANT_EMAIL = _env("ASSISTANT_EMAIL")
+ASSISTANT_PHONE = _env("ASSISTANT_PHONE")
+
 
 def _secret_key() -> str:
     """SECRET_KEY z .env, jinak náhodný klíč uložený v souboru (přežije restart serveru)."""
@@ -56,6 +68,11 @@ MS_DEPUTY_MAILBOX = _env("MS_DEPUTY_MAILBOX")
 MS_ASSISTANT_MAILBOX = _env("MS_ASSISTANT_MAILBOX")
 CALENDAR_EVENT_MINUTES = int(_env("CALENDAR_EVENT_MINUTES", "60") or 60)
 
+# --- SMS (Twilio) ---
+TWILIO_ACCOUNT_SID = _env("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = _env("TWILIO_AUTH_TOKEN")
+TWILIO_FROM = _env("TWILIO_FROM")
+
 # --- Notifikace ---
 TELEGRAM_BOT_TOKEN = _env("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = _env("TELEGRAM_CHAT_ID")
@@ -74,3 +91,11 @@ def openai_enabled() -> bool:
 
 def graph_enabled() -> bool:
     return all([MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET])
+
+
+def email_enabled() -> bool:
+    return bool(SMTP_HOST)
+
+
+def sms_enabled() -> bool:
+    return all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM])

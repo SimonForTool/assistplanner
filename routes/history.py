@@ -2,10 +2,10 @@
 import csv
 import io
 
-from flask import Blueprint, Response, render_template, request
+from flask import Blueprint, Response, flash, redirect, render_template, request, url_for
 
 from models import UserRole
-from routes.auth import login_required
+from routes.auth import current_role, login_required
 from services import task_service
 from utils.helpers import enum_by_name, fmt_dt, now_local, utc_to_local
 
@@ -48,3 +48,11 @@ def export_csv():
     return Response("﻿" + buf.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition":
                              f"attachment; filename=historie_{now_local():%Y%m%d}.csv"})
+
+
+@bp.route("/history/clear", methods=["POST"])
+@login_required
+def clear():
+    count = task_service.clear_history(current_role())
+    flash(f"Historie byla smazána ({count} záznamů).", "success")
+    return redirect(url_for("history.index"))

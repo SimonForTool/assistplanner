@@ -209,7 +209,7 @@ ACTIVITIES = [
 COMMAND_RE = re.compile(r"^(?:prosím\s+)?(?:založ|založit|vytvoř|vytvořit|přidej|přidat|zapiš|zapsat|naplánuj|"
                         r"naplánovat|udělej|nastav|dej|potřebuji|potřebuju|musím|mám)\b\s*", re.I)
 PERSON_STOP = (r"(?=\s*(?:,|;|\.(?!\s*[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])|\bže\b|\baby\b|\bkde\b|\bkdy\b|\bohledně\b|"
-               r"\bkvůli\b|\bo\b|\bna\b|\bv\b|\bve\b|\bdo\b|\bzítra\b|\bdnes\b|\bpozítří\b|$))")
+               r"\bkvůli\b|\bo\b|\bk\b|\bke\b|\bna\b|\bv\b|\bve\b|\bdo\b|\bzítra\b|\bdnes\b|\bpozítří\b|$))")
 
 
 PLACE_NOMINATIVE = {
@@ -218,6 +218,29 @@ PLACE_NOMINATIVE = {
     "radnici": "radnice", "hejtmanství": "hejtmanství", "kraji": "kraj", "salonku": "salonek",
     "restauraci": "restaurace", "kavárně": "kavárna", "hotelu": "hotel", "sněmovně": "sněmovna",
 }
+
+
+# Organizace a podkategorie z diktátu (zkratky i plné názvy)
+ORG_PATTERNS = [
+    ("VFN", r"\bvfn\b|\bv\s?f\s?n\b|všeobecn\w*\s+fakultní\w*\s+nemocnic\w*"),
+    ("ONMB", r"\bonmb\b|\bo\s?n\s?m\s?b\b|oblastní\w*\s+nemocnic\w*\s+mlad\w*\s+boleslav\w*|mlad[áé]\s+boleslav\w*"),
+    ("MZČR", r"\bmzčr\b|\bmz\s?čr\b|\bmzd\b|ministerstv\w*\s+zdravotnictví"),
+    ("FNKV", r"\bfnkv\b|\bf\s?n\s?k\s?v\b|královsk\w*\s+vinohrad\w*"),
+]
+SUB_PATTERNS = {
+    "VFN": [("AI", r"\bai\b|\ba\s?i\b(?=\s)|uměl\w*\s+inteligen\w*"),
+            ("NIS", r"\bnis\b|nemocniční\w*\s+informační\w*\s+systém\w*")],
+}
+
+
+def _organization(text: str) -> tuple[str | None, str | None]:
+    for org, pattern in ORG_PATTERNS:
+        if re.search(pattern, text, re.I):
+            for sub, sub_pattern in SUB_PATTERNS.get(org, []):
+                if re.search(sub_pattern, text, re.I):
+                    return org, sub
+            return org, None
+    return None, None
 
 
 def _segments(text: str) -> tuple[str, dict[str, str]]:
@@ -356,6 +379,7 @@ def extract_task(text: str, now: datetime | None = None) -> dict:
             title = f"{activity}: {title}"
 
     note = _capitalize(parts["note"]) if "note" in parts else None
+    org, sub = _organization(text)
 
     return {
         "title": title[:120],
@@ -366,6 +390,8 @@ def extract_task(text: str, now: datetime | None = None) -> dict:
         "due_date": due.strftime("%Y-%m-%d %H:%M") if due else None,
         "description": note,
         "delegated_to": to_nominative(parts["delegate"]) if parts.get("delegate") else None,
+        "organization": org,
+        "subcategory": sub,
         # text mimo klíčová slova („místo …“, „termín …“) – pro doplnění poznámky
         "remainder": _capitalize(head) or None,
     }

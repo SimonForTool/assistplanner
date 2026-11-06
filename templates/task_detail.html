@@ -11,6 +11,7 @@
     <span class="code small fw-bold text-body-secondary">{{ task.code }}</span>
     {{ priority_badge(task.priority) }} {{ status_badge(task.status) }}
     {% if task.is_commitment %}<span class="tag tone-sky">🤝 Závazek</span>{% endif %}
+    {% if task.organization %}<span class="tag tone-navy">🏥 {{ task.organization }}{{ ' · ' ~ task.subcategory if task.subcategory }}</span>{% endif %}
   </div>
   <h1>{{ task.title }}</h1>
   {% if task.description %}<p class="mb-0 text-pre text-body-secondary">{{ task.description }}</p>{% endif %}
