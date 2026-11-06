@@ -4,6 +4,7 @@ import re
 from functools import wraps
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 import config
 from models import UserRole
@@ -11,6 +12,37 @@ from models import UserRole
 bp = Blueprint("auth", __name__)
 
 PASSWORDS = {UserRole.DEPUTY: config.DEPUTY_PASSWORD, UserRole.ASSISTANT: config.ASSISTANT_PASSWORD}
+MIN_PASSWORD_LENGTH = 8
+
+
+# --- Hesla: změněné heslo (otisk v databázi) má přednost před heslem z .env ---
+
+def _password_hash(role: UserRole) -> str:
+    from services.task_service import get_setting
+    return get_setting(f"{role.name}_password_hash")
+
+
+def has_password(role: UserRole) -> bool:
+    return bool(_password_hash(role) or PASSWORDS.get(role))
+
+
+def check_password(role: UserRole, password: str) -> bool:
+    stored = _password_hash(role)
+    if stored:
+        return check_password_hash(stored, password)
+    expected = PASSWORDS.get(role)
+    return not expected or hmac.compare_digest(password.encode(), expected.encode())
+
+
+def set_password(role: UserRole, password: str) -> None:
+    from services.task_service import set_setting
+    set_setting(f"{role.name}_password_hash", generate_password_hash(password))
+
+
+def _password_version(role: UserRole) -> str:
+    """Otisk aktuálního hesla – po změně hesla se ostatní přihlášená zařízení odhlásí."""
+    stored = _password_hash(role)
+    return stored[-16:] if stored else "env"
 
 
 def current_role() -> UserRole | None:
@@ -21,7 +53,13 @@ def current_role() -> UserRole | None:
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if current_role() is None:
+        role = current_role()
+        if role is None:
+            return redirect(url_for("auth.login", next=request.full_path))
+        if session.get("pwv") != _password_version(role):
+            # heslo se mezitím změnilo (na jiném zařízení) – je potřeba se přihlásit znovu
+            session.clear()
+            flash("Heslo bylo změněno – přihlaste se prosím znovu.", "info")
             return redirect(url_for("auth.login", next=request.full_path))
         return view(*args, **kwargs)
     return wrapped
@@ -39,16 +77,38 @@ def login():
     if request.method == "POST":
         role = UserRole.__members__.get(request.form.get("role", ""))
         password = request.form.get("password", "")
-        expected = PASSWORDS.get(role) if role else None
-        if role and (not expected or hmac.compare_digest(password.encode(), expected.encode())):
+        if role and check_password(role, password):
             csrf = session.get("_csrf")
             session.clear()
             session["role"] = role.name
+            session["pwv"] = _password_version(role)
             session["_csrf"] = csrf
             session.permanent = True
             return redirect(safe_next(request.args.get("next")))
         flash("Nesprávné heslo.", "danger")
-    return render_template("login.html", passwordless=not all(PASSWORDS.values()))
+    return render_template("login.html", passwordless=not all(has_password(r) for r in UserRole))
+
+
+@bp.route("/profile/password", methods=["POST"])
+@login_required
+def change_password():
+    role = current_role()
+    current = request.form.get("current", "")
+    new = request.form.get("new", "")
+    confirm = request.form.get("confirm", "")
+    if has_password(role) and not check_password(role, current):
+        flash("Současné heslo není správné.", "danger")
+    elif len(new) < MIN_PASSWORD_LENGTH:
+        flash(f"Nové heslo musí mít alespoň {MIN_PASSWORD_LENGTH} znaků.", "danger")
+    elif new != confirm:
+        flash("Nová hesla se neshodují.", "danger")
+    elif new == current:
+        flash("Nové heslo je stejné jako současné.", "warning")
+    else:
+        set_password(role, new)
+        session["pwv"] = _password_version(role)  # toto zařízení zůstane přihlášené
+        flash("Heslo bylo změněno. Ostatní zařízení s tímto profilem se odhlásí.", "success")
+    return redirect(url_for("auth.profile") + "#password")
 
 
 @bp.route("/logout", methods=["POST"])

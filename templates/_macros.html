@@ -151,7 +151,7 @@
     {% macro recipient(role, kind) -%}
       {% set value = contact(role, kind) %}
       {%- if value -%}{{ value }}{{ ' · ' ~ ('e-mail nepřipojen' if kind == 'email' else 'SMS nepřipojeny') if not (settings.email_enabled() if kind == 'email' else settings.sms_enabled()) }}
-      {%- else -%}{{ 'e-mail' if kind == 'email' else 'telefon' }} není nastaven – <a href="{{ url_for('auth.profile') }}">Moje kontakty</a>{%- endif -%}
+      {%- else -%}{{ 'e-mail' if kind == 'email' else 'telefon' }} není nastaven – <a href="{{ url_for('auth.profile') }}">Můj profil</a>{%- endif -%}
     {%- endmacro %}
     <div class="col-12">
       <div class="form-label mb-0" data-show-work {{ 'hidden' if private }}>📣 Upozornění – {{ UserRole.ASSISTANT.value }}</div>
@@ -166,7 +166,7 @@
           {% set work_to, work_cc = email_recipients(false) %}
           <span class="d-block small text-body-secondary" data-show-work {{ 'hidden' if private }}>
             {%- if work_to -%}{{ work_to }}{{ ' · kopie ' ~ work_cc|join(', ') if work_cc }}{{ ' · e-mail nepřipojen' if not settings.email_enabled() }}
-            {%- else -%}e-mail není nastaven – <a href="{{ url_for('auth.profile') }}">Moje kontakty</a>{%- endif -%}</span>
+            {%- else -%}e-mail není nastaven – <a href="{{ url_for('auth.profile') }}">Můj profil</a>{%- endif -%}</span>
           <span class="d-block small text-body-secondary" data-show-private {{ 'hidden' if not private }}>{{ recipient(UserRole.DEPUTY, 'email') }}</span></label>
       </div>
     </div>

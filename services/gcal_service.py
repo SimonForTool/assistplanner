@@ -3,7 +3,7 @@
 Skript běží v Google účtu, do jehož kalendáře se zapisuje (např. soukromý Gmail asistentky).
 Aplikace mu posílá JSON s tajným klíčem; skript událost vytvoří, upraví nebo zruší přes
 Google Calendar API, takže změny a zrušení dostanou i pozvaní hosté (např. v Outlooku).
-Adresa skriptu a tajný klíč se nastavují v aplikaci (Moje kontakty → Google kalendář), uloží se
+Adresa skriptu a tajný klíč se nastavují v aplikaci (Můj profil → Google kalendář), uloží se
 do databáze a mají přednost před GCAL_SCRIPT_URL / GCAL_SECRET v .env.
 Bez adresy běží zkušební režim: nic se neodesílá a události dostanou ID „mock-…“.
 """
@@ -93,7 +93,7 @@ def _call(payload: dict) -> dict:
                      "a nasaďte novou verzi (Implementovat → Spravovat implementace → upravit → Nová verze)")
         elif error == "unauthorized":
             error = ("nesouhlasí tajný klíč – řádek const SECRET ve skriptu musí být přesně ten, který "
-                     "ukazuje aplikace v Moje kontakty, a skript je potřeba nasadit v nové verzi")
+                     "ukazuje aplikace v Můj profil, a skript je potřeba nasadit v nové verzi")
         raise GCalError(f"Google kalendář: {error}")
     return data
 
@@ -146,7 +146,7 @@ SCRIPT_VERSION = 2  # verze google_apps_script/Syncho.gs, kterou aplikace potře
 def ping() -> str:
     """Ověří spojení se skriptem; vrátí název kalendáře (a upozorní na starou verzi skriptu)."""
     if not is_configured():
-        raise GCalError("Google kalendář není propojen – vložte adresu skriptu v Moje kontakty.")
+        raise GCalError("Google kalendář není propojen – vložte adresu skriptu v Můj profil.")
     data = _call({"action": "ping"})
     name = data.get("calendar", "?")
     from services.task_service import set_setting
